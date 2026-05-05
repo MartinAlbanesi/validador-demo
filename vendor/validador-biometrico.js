@@ -21929,8 +21929,24 @@ function Tr({ label: t, value: a, source: i }) {
     ] })
   ] });
 }
-function QS({ ocr: t, biometry: a, issues: i }) {
+function uE({ returnUrl: t, status: a, ocr: i, biometry: o, error: s }) {
+  q.useEffect(() => {
+    if (!t) return;
+    const u = window.setTimeout(() => {
+      try {
+        const f = new URL(t, window.location.href);
+        f.searchParams.set("validation_status", a), s && f.searchParams.set("validation_error", s), i?.nombre && f.searchParams.set("validation_name", i.nombre), i?.apellido && f.searchParams.set("validation_last_name", i.apellido), i?.dni_number && f.searchParams.set("validation_dni", i.dni_number), i?.fecha_nacimiento && f.searchParams.set("validation_dob", i.fecha_nacimiento), o?.liveness_score != null && f.searchParams.set("validation_liveness", String(o.liveness_score)), window.location.assign(f.toString());
+      } catch (p) {
+        console.error("[validador-biometrico] redirect to portal failed:", p);
+      }
+    }, 2500);
+    return () => window.clearTimeout(u);
+  }, [t, a, i, o, s]);
+  return null;
+}
+function QS({ ocr: t, biometry: a, issues: i, returnUrl: o }) {
   return /* @__PURE__ */ m.jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ m.jsx(uE, { returnUrl: o, status: "approved", ocr: t, biometry: a }),
     /* @__PURE__ */ m.jsxs(xt, { children: [
       /* @__PURE__ */ m.jsxs("div", { className: "text-center px-7 pt-[28px] pb-[22px]", children: [
         /* @__PURE__ */ m.jsx("div", { className: "w-[76px] h-[76px] rounded-full flex items-center justify-center mx-auto mb-4 bg-success/10 border border-success/30 shadow-[0_0_40px_rgba(0,200,150,0.15)]", children: /* @__PURE__ */ m.jsx(gl, { size: 38, strokeWidth: 1.5, className: "text-success" }) }),
@@ -21961,8 +21977,9 @@ const FS = [
   { label: "Selfie de verificación", desc: "Prueba de vida completada" },
   { label: "Confirmación de datos", desc: "Datos revisados" }
 ];
-function ZS({ ocr: t, biometry: a, issues: i, onRestart: o }) {
+function ZS({ ocr: t, biometry: a, issues: i, onRestart: o, returnUrl: s }) {
   return /* @__PURE__ */ m.jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ m.jsx(uE, { returnUrl: s, status: "manual_review", ocr: t, biometry: a }),
     /* @__PURE__ */ m.jsx(xt, { children: /* @__PURE__ */ m.jsxs("div", { className: "px-7 pt-[22px] pb-[18px]", children: [
       /* @__PURE__ */ m.jsx(
         "p",
@@ -22048,8 +22065,9 @@ const KS = [
   "Mire directamente a la cámara y mantenga una expresión neutra durante la selfie",
   "Use un fondo liso y neutro, alejado de objetos que distraigan"
 ];
-function JS({ ocr: t, biometry: a, issues: i, onRestart: o }) {
+function JS({ ocr: t, biometry: a, issues: i, onRestart: o, returnUrl: s }) {
   return /* @__PURE__ */ m.jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ m.jsx(uE, { returnUrl: s, status: "rejected", ocr: t, biometry: a, error: i?.join(" · ") }),
     /* @__PURE__ */ m.jsxs(xt, { children: [
       /* @__PURE__ */ m.jsxs("div", { className: "text-center px-7 pt-[28px] pb-[22px]", children: [
         /* @__PURE__ */ m.jsx("div", { className: "w-[76px] h-[76px] rounded-full flex items-center justify-center mx-auto mb-4 bg-destructive/10 border border-destructive/30", children: /* @__PURE__ */ m.jsx(Hv, { size: 38, strokeWidth: 1.5, className: "text-destructive" }) }),
@@ -22132,7 +22150,7 @@ function WS(t, a) {
   const i = [...t.quality_issues || []];
   return a && !a.liveness_passed && i.push("La prueba de vida no fue superada"), a && !a.face_match && i.push("El rostro no coincide con la foto del documento"), i;
 }
-function $S({ ocr: t, biometry: a, error: i, onRestart: o }) {
+function $S({ ocr: t, biometry: a, error: i, onRestart: o, returnUrl: s }) {
   if (i)
     return /* @__PURE__ */ m.jsxs(xt, { children: [
       /* @__PURE__ */ m.jsxs("div", { className: "text-center px-7 pt-[22px] pb-[16px]", children: [
@@ -22148,8 +22166,8 @@ function $S({ ocr: t, biometry: a, error: i, onRestart: o }) {
       ] })
     ] });
   if (!t) return null;
-  const s = PS(t, a), u = WS(t, a), f = { ocr: t, biometry: a, issues: u, onRestart: o };
-  return s === "approved" ? /* @__PURE__ */ m.jsx(QS, { ...f }) : s === "pending" ? /* @__PURE__ */ m.jsx(ZS, { ...f }) : /* @__PURE__ */ m.jsx(JS, { ...f });
+  const u = PS(t, a), f = WS(t, a), p = { ocr: t, biometry: a, issues: f, onRestart: o, returnUrl: s };
+  return u === "approved" ? /* @__PURE__ */ m.jsx(QS, { ...p }) : u === "pending" ? /* @__PURE__ */ m.jsx(ZS, { ...p }) : /* @__PURE__ */ m.jsx(JS, { ...p });
 }
 function eE({ children: t, mobileUrl: a }) {
   const { isMobile: i } = ip(), [o, s] = q.useState(!1);
@@ -22270,10 +22288,10 @@ w6(
   () => Cg.getState().token,
   () => Cg.getState().logout()
 );
-function aE({ onComplete: t, onRestart: a, mobileUrl: i }) {
-  return /* @__PURE__ */ m.jsx(eE, { mobileUrl: i, children: /* @__PURE__ */ m.jsx(rE, { onComplete: t, onRestart: a }) });
+function aE({ onComplete: t, onRestart: a, mobileUrl: i, returnUrl: o }) {
+  return /* @__PURE__ */ m.jsx(eE, { mobileUrl: i, children: /* @__PURE__ */ m.jsx(rE, { onComplete: t, onRestart: a, returnUrl: o }) });
 }
-function rE({ onComplete: t, onRestart: a }) {
+function rE({ onComplete: t, onRestart: a, returnUrl: Q }) {
   const {
     step: i,
     setStep: o,
@@ -22342,7 +22360,8 @@ function rE({ onComplete: t, onRestart: a }) {
           ocr: f,
           biometry: p,
           error: g,
-          onRestart: V
+          onRestart: V,
+          returnUrl: Q
         }
       )
     ] })
@@ -22377,7 +22396,7 @@ class sE extends HTMLElement {
   reactRoot = null;
   shadow = null;
   static get observedAttributes() {
-    return ["api-url", "mobile-url"];
+    return ["api-url", "mobile-url", "return-url"];
   }
   connectedCallback() {
     console.log("[validador-biometrico] connectedCallback START");
@@ -22395,7 +22414,7 @@ class sE extends HTMLElement {
     this.reactRoot?.unmount(), this.reactRoot = null;
   }
   attributeChangedCallback(a, i, o) {
-    a === "api-url" && o && jg(o), a === "mobile-url" && this.renderApp();
+    a === "api-url" && o && jg(o), (a === "mobile-url" || a === "return-url") && this.renderApp();
   }
   // -----------------------------------------------------------------------
   // Style injection — uses <style> tags for maximum compatibility.
@@ -22434,13 +22453,14 @@ class sE extends HTMLElement {
   // -----------------------------------------------------------------------
   renderApp() {
     if (!this.reactRoot) return;
-    const a = this.getAttribute("mobile-url") ?? void 0;
+    const a = this.getAttribute("mobile-url") ?? void 0, i = this.getAttribute("return-url") ?? new URLSearchParams(window.location.search).get("return_url") ?? void 0;
     this.reactRoot.render(
       /* @__PURE__ */ m.jsx(q.StrictMode, { children: /* @__PURE__ */ m.jsx(
         aE,
         {
           mobileUrl: a,
-          onComplete: (i) => this.handleComplete(i),
+          returnUrl: i,
+          onComplete: (o) => this.handleComplete(o),
           onRestart: () => this.emit("validation-restart", null)
         }
       ) })

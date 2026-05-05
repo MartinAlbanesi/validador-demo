@@ -9,6 +9,15 @@
 const ATM_API_KEY         = "" // Set when API key is available
 const API_BASE            = "https://api-validador-atm.duckdns.org/api/v1"
 const MOBILE_URL_FALLBACK = "https://validador-atm.duckdns.org/"
+const VALIDATION_RETURN_PARAMS = [
+  "validation_status",
+  "validation_error",
+  "validation_name",
+  "validation_last_name",
+  "validation_dni",
+  "validation_dob",
+  "validation_liveness",
+]
 
 // ─── Element refs ─────────────────────────────────────────────────
 const modal          = document.getElementById("validator-modal")
@@ -38,6 +47,23 @@ function clearCurrentSession() {
   currentSessionId = null
 }
 
+function getPortalReturnUrl() {
+  const url = new URL(window.location.href)
+  VALIDATION_RETURN_PARAMS.forEach((param) => url.searchParams.delete(param))
+  return url.toString()
+}
+
+function buildMobileRedirectUrl(url) {
+  try {
+    const targetUrl = new URL(url, window.location.href)
+    targetUrl.searchParams.set("return_url", getPortalReturnUrl())
+    return targetUrl.toString()
+  } catch (err) {
+    console.warn("[Portal] Could not append return_url to mobile redirect:", err)
+    return url
+  }
+}
+
 // ─── Modal ────────────────────────────────────────────────────────
 function openModal() {
   modal.hidden = false
@@ -64,7 +90,10 @@ function closeModal(options = {}) {
 // ─── WC attribute helper ──────────────────────────────────────────
 function setWcMobileUrl(url) {
   const wc = document.getElementById("the-validator")
-  if (wc) wc.setAttribute("mobile-url", url)
+  if (!wc) return
+
+  wc.setAttribute("return-url", getPortalReturnUrl())
+  wc.setAttribute("mobile-url", buildMobileRedirectUrl(url))
 }
 
 // ─── Integration API + polling ────────────────────────────────────
@@ -326,12 +355,53 @@ function formatDni(raw) {
   return d.length === 8 ? d.replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") : d
 }
 
+function applyReturnedValidationState() {
+  const url = new URL(window.location.href)
+  const status = url.searchParams.get("validation_status")
+  if (!status) return
+
+  stopPolling()
+  clearCurrentSession()
+  closeModal()
+
+  const detail = {
+    ocrResult: {
+      nombre: url.searchParams.get("validation_name") ?? "",
+      apellido: url.searchParams.get("validation_last_name") ?? "",
+      dni_number: url.searchParams.get("validation_dni") ?? "",
+      fecha_nacimiento: url.searchParams.get("validation_dob") ?? "",
+    },
+    biometryResult: {},
+  }
+
+  const livenessParam = url.searchParams.get("validation_liveness")
+  const liveness = livenessParam == null ? Number.NaN : Number(livenessParam)
+  if (!Number.isNaN(liveness)) {
+    detail.biometryResult.liveness_score = liveness
+  }
+
+  if (status === "approved") {
+    setApproved(detail)
+  } else if (status === "manual_review" || status === "pending") {
+    setManualReview()
+  } else if (status === "rejected") {
+    setRejected({
+      error: url.searchParams.get("validation_error") || "La verificación biométrica no fue exitosa.",
+    })
+  }
+
+  VALIDATION_RETURN_PARAMS.forEach((param) => url.searchParams.delete(param))
+  window.history.replaceState({}, "", url.toString())
+}
+
 // ─── Event listeners ──────────────────────────────────────────────
 function userCloseModal() {
   const wasWaiting = !stateWaiting.hidden
   closeModal()
   if (wasWaiting) resetToPending()
 }
+
+applyReturnedValidationState()
 
 startBtn.addEventListener("click", openModal)
 retryBtn.addEventListener("click", openModal)
