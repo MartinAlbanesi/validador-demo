@@ -32,6 +32,10 @@ const step3             = document.getElementById("step-3")
 let pollInterval     = null
 let currentSessionId = null
 
+function clearCurrentSession() {
+  currentSessionId = null
+}
+
 // ─── Modal ────────────────────────────────────────────────────────
 function openModal() {
   modal.hidden = false
@@ -46,11 +50,12 @@ function openModal() {
   }
 }
 
-function closeModal() {
+function closeModal(options = {}) {
+  const { stopActivePolling = true, clearSession = true } = options
   modal.hidden = true
   document.body.classList.remove("modal-open")
-  stopPolling()
-  currentSessionId = null
+  if (stopActivePolling) stopPolling()
+  if (clearSession) clearCurrentSession()
 }
 
 // ─── WC attribute helper ──────────────────────────────────────────
@@ -95,6 +100,7 @@ async function createSessionAndPoll() {
 }
 
 function startPolling(sessionId) {
+  currentSessionId = sessionId
   stopPolling()
   pollInterval = setInterval(async () => {
     try {
@@ -121,9 +127,9 @@ function startPolling(sessionId) {
         setApproved(detail)
 
       } else if (status === "manual_review") {
-        stopPolling()
-        closeModal()
+        closeModal({ stopActivePolling: false, clearSession: false })
         setManualReview()
+        startReviewPolling(sessionId)
       } else if (status === "rejected") {
         stopPolling()
         closeModal()
@@ -135,6 +141,45 @@ function startPolling(sessionId) {
       console.error("[Portal] Polling error:", err)
     }
   }, 3000)
+}
+
+function startReviewPolling(sessionId) {
+  currentSessionId = sessionId
+  stopPolling()
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/integration/sessions/${sessionId}/status`)
+      if (!res.ok) return
+      const { status, rejection_code } = await res.json()
+
+      if (status === "approved") {
+        stopPolling()
+        let detail = {}
+        try {
+          const detailRes = await fetch(`${API_BASE}/integration/sessions/${sessionId}`, {
+            headers: { "X-API-Key": ATM_API_KEY },
+          })
+          if (detailRes.ok) {
+            const d = await detailRes.json()
+            detail = {
+              ocrResult: d.dni_extracted,
+              biometryResult: { liveness_score: d.scores?.liveness_score },
+            }
+          }
+        } catch { /* detail unavailable â€” setApproved handles nulls */ }
+        clearCurrentSession()
+        setApproved(detail)
+      } else if (status === "rejected") {
+        stopPolling()
+        clearCurrentSession()
+        setRejected({
+          error: `VerificaciÃ³n rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
+        })
+      }
+    } catch (err) {
+      console.error("[Portal] Review polling error:", err)
+    }
+  }, 10000)
 }
 
 function stopPolling() {
@@ -218,6 +263,9 @@ function setManualReview() {
 }
 
 function resetToPending() {
+  stopPolling()
+  clearCurrentSession()
+
   statusBadge.className = "badge badge-pending"
   statusBadge.innerHTML = '<span class="badge-dot"></span> Pendiente'
 

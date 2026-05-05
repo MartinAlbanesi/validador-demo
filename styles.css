@@ -319,6 +319,32 @@ button { font-family: var(--font-body); cursor: pointer; }
 .state-content { flex: 1; min-width: 0; }
 .state-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin-bottom: 8px; }
 .state-text  { font-size: 14px; color: var(--muted); line-height: 1.65; margin-bottom: 16px; }
+.review-autoupdate {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(14, 110, 181, 0.08);
+  color: var(--accent);
+  border: 1px solid rgba(14, 110, 181, 0.16);
+  font-size: 13px;
+  font-weight: 600;
+}
+.review-autoupdate-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0 rgba(14, 110, 181, 0.35);
+  animation: reviewPulse 1.8s ease-out infinite;
+}
+
+@keyframes reviewPulse {
+  0%   { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(14, 110, 181, 0.35); }
+  70%  { transform: scale(1); box-shadow: 0 0 0 8px rgba(14, 110, 181, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(14, 110, 181, 0); }
+}
 
 .tramite-reqs { display: flex; flex-direction: column; gap: 6px; }
 .tramite-reqs li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
