@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal ATM · Alta de Contribuyente</title>
+  <meta name="description" content="Portal de Trámites — Agencia Tributaria de Misiones" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══ NAVBAR ════════════════════════════════════════════════════════ -->
+<nav class="portal-nav">
+  <div class="portal-nav-inner">
+    <div class="portal-brand">
+      <img src="assets/LOGO-ATM.png" alt="ATM" class="portal-logo" />
+      <div class="nav-divider"></div>
+      <span class="portal-brand-name">Portal de Trámites</span>
+    </div>
+    <div class="portal-nav-right">
+      <button class="portal-icon-btn" aria-label="Notificaciones">
+        <i class="bi bi-bell"></i>
+        <span class="notif-dot">2</span>
+      </button>
+      <div class="portal-user">
+        <div class="portal-avatar">JP</div>
+        <div class="portal-user-meta">
+          <span class="portal-user-name">Juan Pérez</span>
+          <span class="portal-user-sub">DNI 28.543.671</span>
+        </div>
+        <i class="bi bi-chevron-down portal-user-caret"></i>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ BODY ══════════════════════════════════════════════════════════ -->
+<div class="portal-body">
+
+  <!-- SIDEBAR -->
+  <aside class="portal-sidebar">
+    <nav class="sidebar-nav">
+      <a href="#" class="sidebar-item">
+        <i class="bi bi-house"></i><span>Inicio</span>
+      </a>
+      <a href="#" class="sidebar-item sidebar-item--active">
+        <i class="bi bi-folder2-open"></i><span>Mis Trámites</span>
+      </a>
+      <a href="#" class="sidebar-item">
+        <i class="bi bi-people"></i><span>Contribuyentes</span>
+      </a>
+      <a href="#" class="sidebar-item">
+        <i class="bi bi-file-earmark-text"></i><span>Documentación</span>
+      </a>
+      <a href="#" class="sidebar-item">
+        <i class="bi bi-bell"></i><span>Notificaciones</span>
+        <span class="sidebar-badge">2</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="#" class="sidebar-item sidebar-item--sm">
+        <i class="bi bi-gear"></i><span>Configuración</span>
+      </a>
+      <a href="#" class="sidebar-item sidebar-item--sm sidebar-item--danger">
+        <i class="bi bi-box-arrow-right"></i><span>Cerrar sesión</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="portal-main">
+
+    <nav class="breadcrumb" aria-label="Ruta de navegación">
+      <a href="#" class="breadcrumb-link">Mis Trámites</a>
+      <i class="bi bi-chevron-right breadcrumb-sep"></i>
+      <span>Alta de Contribuyente</span>
+    </nav>
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Alta de Contribuyente</h1>
+        <p class="page-subtitle">Completá los pasos para registrarte como contribuyente en el sistema ATM.</p>
+      </div>
+      <div class="page-meta">
+        <span class="page-meta-item"><i class="bi bi-calendar3"></i> Iniciado: 05/05/2026</span>
+        <span class="page-meta-item"><i class="bi bi-clock-history"></i> Vence: 19/05/2026</span>
+      </div>
+    </div>
+
+    <!-- Tramite Card -->
+    <div class="tramite-card">
+
+      <div class="tramite-card-header">
+        <div>
+          <h2 class="tramite-card-title">Paso 2 — Verificación Biométrica</h2>
+          <span class="tramite-id">TRM-2025-004821</span>
+        </div>
+        <span class="badge badge-pending" id="status-badge">
+          <span class="badge-dot"></span>Pendiente
+        </span>
+      </div>
+
+      <div class="tramite-steps">
+        <div class="steps-track">
+          <div class="step-node step-done" id="step-1">
+            <div class="step-circle"><i class="bi bi-check-lg"></i></div>
+            <span class="step-label">Datos personales</span>
+          </div>
+          <div class="step-node step-active" id="step-2">
+            <div class="step-circle">2</div>
+            <span class="step-label">Verificación biométrica</span>
+          </div>
+          <div class="step-node" id="step-3">
+            <div class="step-circle">3</div>
+            <span class="step-label">Confirmación</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado: pendiente -->
+      <div class="tramite-body tramite-body--cta" id="state-pending">
+        <p class="state-hint">Necesitás tu DNI y acceso a la cámara de tu celular.</p>
+        <button class="btn btn-primary btn-cta" id="start-btn">
+          <i class="bi bi-fingerprint"></i>Iniciar Verificación Biométrica
+        </button>
+      </div>
+
+      <!-- Estado: aprobada -->
+      <div class="tramite-body" id="state-approved" hidden>
+        <div class="state-icon-wrap state-icon-wrap--success">
+          <i class="bi bi-patch-check-fill"></i>
+        </div>
+        <div class="state-content">
+          <h3 class="state-title">Identidad verificada correctamente</h3>
+          <p class="state-text">Tu identidad fue validada con éxito. Podés continuar al paso de confirmación.</p>
+          <dl class="verification-data">
+            <div class="vd-row"><dt>Nombre completo</dt><dd id="vd-name">—</dd></div>
+            <div class="vd-row"><dt>N.º de DNI</dt><dd id="vd-dni">—</dd></div>
+            <div class="vd-row"><dt>Fecha de nacimiento</dt><dd id="vd-dob">—</dd></div>
+            <div class="vd-row"><dt>Liveness score</dt><dd id="vd-liveness">—</dd></div>
+            <div class="vd-row vd-row--full"><dt>Verificado el</dt><dd id="vd-date">—</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Estado: rechazada -->
+      <div class="tramite-body" id="state-rejected" hidden>
+        <div class="state-icon-wrap state-icon-wrap--error">
+          <i class="bi bi-x-circle-fill"></i>
+        </div>
+        <div class="state-content">
+          <h3 class="state-title">No se pudo verificar la identidad</h3>
+          <p class="state-text" id="rejection-message">La verificación biométrica no fue exitosa.</p>
+        </div>
+      </div>
+
+      <div class="tramite-footer" id="tramite-footer" hidden>
+        <button class="btn btn-primary" id="continue-btn">
+          Continuar al Paso 3<i class="bi bi-arrow-right"></i>
+        </button>
+        <button class="btn btn-ghost" id="retry-btn" hidden>
+          <i class="bi bi-arrow-counterclockwise"></i>Reintentar verificación
+        </button>
+      </div>
+
+    </div><!-- /tramite-card -->
+  </main>
+</div><!-- /portal-body -->
+
+<!-- ═══ MODAL ════════════════════════════════════════════════════════ -->
+<div class="vmodal" id="validator-modal" hidden>
+  <div class="vmodal-backdrop" id="vmodal-backdrop"></div>
+  <div class="vmodal-panel">
+    <button class="vmodal-close" id="vmodal-close" aria-label="Cerrar verificación">
+      <i class="bi bi-x-lg"></i>
+    </button>
+    <div id="wc-host">
+      <validador-biometrico
+        id="the-validator"
+        api-url="https://api-validador-atm.duckdns.org/api/v1"
+        mobile-url="https://validador-atm.duckdns.org/"
+      ></validador-biometrico>
+    </div>
+    <div class="vmodal-manual" id="vmodal-manual" hidden>
+      <p>¿Completaste la verificación en tu celular?</p>
+      <button class="btn btn-ghost btn-sm" id="manual-done-btn">
+        <i class="bi bi-check2"></i>Ya completé en mi celular
+      </button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="../validador-front/dist-wc/validador-biometrico.js"></script>
+<script src="main.js" defer></script>
+
+</body>
+</html>
