@@ -93,7 +93,11 @@ async function createSessionAndPoll() {
 
     const data = await res.json()
     currentSessionId = data.session_id
-    setWcMobileUrl(data.validator_url)
+
+    const landingUrl = `${window.location.origin}${window.location.pathname}?session_id=${data.session_id}`
+    const validatorUrl = new URL(data.validator_url)
+    validatorUrl.searchParams.set("redirect_url", landingUrl)
+    setWcMobileUrl(validatorUrl.toString())
     startPolling(data.session_id)
   } catch (err) {
     console.error("[Portal] Session creation failed — falling back to manual:", err)
@@ -360,4 +364,57 @@ document.addEventListener("validation-error", (e) => {
 
 document.addEventListener("validation-restart", () => {
   resetToPending()
+})
+
+// ─── Deep-link: mobile redirect back after validation ─────────────
+async function resumeFromSessionId(sessionId) {
+  currentSessionId = sessionId
+  setWaiting()
+
+  // Clean session_id from URL without reload
+  const url = new URL(window.location.href)
+  url.searchParams.delete("session_id")
+  history.replaceState(null, "", url.toString())
+
+  try {
+    const res = await fetch(`${API_BASE}/integration/sessions/${sessionId}/status`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const { status, rejection_code } = await res.json()
+
+    if (status === "approved") {
+      let detail = {}
+      try {
+        const detailRes = await fetch(`${API_BASE}/integration/sessions/${sessionId}`, {
+          headers: { "X-API-Key": ATM_API_KEY },
+        })
+        if (detailRes.ok) {
+          const d = await detailRes.json()
+          detail = {
+            ocrResult: d.dni_extracted,
+            biometryResult: { liveness_score: d.scores?.liveness_score },
+          }
+        }
+      } catch { /* detail unavailable */ }
+      clearCurrentSession()
+      setApproved(detail)
+    } else if (status === "rejected") {
+      clearCurrentSession()
+      setRejected({ error: `Verificación rechazada${rejection_code ? ` (${rejection_code})` : ""}.` })
+    } else if (status === "manual_review") {
+      setManualReview()
+      startReviewPolling(sessionId)
+    } else {
+      // Still pending — start polling
+      startPolling(sessionId)
+    }
+  } catch (err) {
+    console.error("[Portal] Resume failed — starting polling:", err)
+    startPolling(sessionId)
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search)
+  const sessionId = params.get("session_id")
+  if (sessionId) resumeFromSessionId(sessionId)
 })
