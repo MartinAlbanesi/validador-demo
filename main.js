@@ -70,6 +70,12 @@ async function createSessionAndPoll() {
       },
       body: JSON.stringify({
         external_id: `portal-demo-${Date.now()}`,
+        // El portal mock muestra "Juan Pérez · DNI 28.543.671" — mandamos
+        // ese DNI para que el cross-check del backend tenga algo contra qué
+        // comparar. En producción real, ATM lo tomaría del trámite del
+        // contribuyente (no hardcodeado). El validador requiere `dni` o
+        // `cuit` (al menos uno) — sin eso devuelve 422.
+        dni: "28543671",
         callback_url: "https://validador-atm.duckdns.org/webhook",
         expires_in_minutes: 30,
       }),
