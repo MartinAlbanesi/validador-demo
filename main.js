@@ -1,7 +1,7 @@
 /**
  * Portal ATM — main.js
  *
- * State machine: "pending" | "approved" | "rejected"
+ * State machine: "pending" | "approved" | "rejected" | "manual_review"
  * Modal lifecycle is independent of portal state.
  */
 
@@ -21,10 +21,12 @@ const continueBtn    = document.getElementById("continue-btn")
 const retryBtn       = document.getElementById("retry-btn")
 const tramiteFooter  = document.getElementById("tramite-footer")
 const statusBadge    = document.getElementById("status-badge")
-const statePending   = document.getElementById("state-pending")
-const stateApproved  = document.getElementById("state-approved")
-const stateRejected  = document.getElementById("state-rejected")
-const step2          = document.getElementById("step-2")
+const statePending      = document.getElementById("state-pending")
+const stateApproved     = document.getElementById("state-approved")
+const stateRejected     = document.getElementById("state-rejected")
+const stateManualReview = document.getElementById("state-manual-review")
+const step2             = document.getElementById("step-2")
+const step3             = document.getElementById("step-3")
 
 // ─── Runtime state ────────────────────────────────────────────────
 let pollInterval     = null
@@ -112,13 +114,15 @@ function startPolling(sessionId) {
         closeModal()
         setApproved(detail)
 
-      } else if (status === "rejected" || status === "manual_review") {
+      } else if (status === "manual_review") {
+        stopPolling()
+        closeModal()
+        setManualReview()
+      } else if (status === "rejected") {
         stopPolling()
         closeModal()
         setRejected({
-          error: status === "manual_review"
-            ? "Verificación enviada a revisión manual."
-            : `Verificación rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
+          error: `Verificación rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
         })
       }
     } catch (err) {
@@ -156,13 +160,16 @@ function setApproved(detail) {
 
   step2.className = "step-node step-done"
   step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step3.className = "step-node step-active"
+  step3.querySelector(".step-circle").textContent = "3"
 
-  statePending.hidden  = true
-  stateApproved.hidden = false
-  stateRejected.hidden = true
-  tramiteFooter.hidden = false
-  continueBtn.hidden   = false
-  retryBtn.hidden      = true
+  statePending.hidden      = true
+  stateApproved.hidden     = false
+  stateRejected.hidden     = true
+  stateManualReview.hidden = true
+  tramiteFooter.hidden     = false
+  continueBtn.hidden       = false
+  retryBtn.hidden          = true
 }
 
 function setRejected(detail) {
@@ -174,13 +181,34 @@ function setRejected(detail) {
 
   step2.className = "step-node step-rejected"
   step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-x-lg"></i>'
+  step3.className = "step-node step-active"
+  step3.querySelector(".step-circle").textContent = "3"
 
-  statePending.hidden  = true
-  stateApproved.hidden = true
-  stateRejected.hidden = false
-  tramiteFooter.hidden = false
-  continueBtn.hidden   = true
-  retryBtn.hidden      = false
+  statePending.hidden      = true
+  stateApproved.hidden     = true
+  stateRejected.hidden     = false
+  stateManualReview.hidden = true
+  tramiteFooter.hidden     = false
+  continueBtn.hidden       = true
+  retryBtn.hidden          = false
+}
+
+function setManualReview() {
+  statusBadge.className = "badge badge-manual-review"
+  statusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> En revisión'
+
+  step2.className = "step-node step-warning"
+  step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-hourglass-split"></i>'
+  step3.className = "step-node step-active"
+  step3.querySelector(".step-circle").textContent = "3"
+
+  statePending.hidden      = true
+  stateApproved.hidden     = true
+  stateRejected.hidden     = true
+  stateManualReview.hidden = false
+  tramiteFooter.hidden     = true
+  continueBtn.hidden       = true
+  retryBtn.hidden          = true
 }
 
 function resetToPending() {
@@ -189,13 +217,16 @@ function resetToPending() {
 
   step2.className = "step-node step-active"
   step2.querySelector(".step-circle").textContent = "2"
+  step3.className = "step-node"
+  step3.querySelector(".step-circle").textContent = "3"
 
-  statePending.hidden  = false
-  stateApproved.hidden = true
-  stateRejected.hidden = true
-  tramiteFooter.hidden = true
-  continueBtn.hidden   = true
-  retryBtn.hidden      = true
+  statePending.hidden      = false
+  stateApproved.hidden     = true
+  stateRejected.hidden     = true
+  stateManualReview.hidden = true
+  tramiteFooter.hidden     = true
+  continueBtn.hidden       = true
+  retryBtn.hidden          = true
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
