@@ -97,7 +97,7 @@
 
       <div class="tramite-card-header">
         <div>
-          <h2 class="tramite-card-title">Paso 2 — Verificación Biométrica</h2>
+          <h2 class="tramite-card-title">Verificación de Identidad</h2>
           <span class="tramite-id">TRM-2025-004821</span>
         </div>
         <span class="badge badge-pending" id="status-badge">
@@ -107,13 +107,13 @@
 
       <div class="tramite-steps">
         <div class="steps-track">
-          <div class="step-node step-done" id="step-1">
-            <div class="step-circle"><i class="bi bi-check-lg"></i></div>
-            <span class="step-label">Datos personales</span>
-          </div>
-          <div class="step-node step-active" id="step-2">
-            <div class="step-circle">2</div>
+          <div class="step-node step-active" id="step-1">
+            <div class="step-circle">1</div>
             <span class="step-label">Verificación biométrica</span>
+          </div>
+          <div class="step-node" id="step-2">
+            <div class="step-circle">2</div>
+            <span class="step-label">Validación en el celular</span>
           </div>
           <div class="step-node" id="step-3">
             <div class="step-circle">3</div>
@@ -128,6 +128,21 @@
         <button class="btn btn-primary btn-cta" id="start-btn">
           <i class="bi bi-fingerprint"></i>Iniciar Verificación Biométrica
         </button>
+      </div>
+
+      <!-- Estado: esperando validación en celular -->
+      <div class="tramite-body" id="state-waiting" hidden>
+        <div class="state-icon-wrap state-icon-wrap--info">
+          <i class="bi bi-phone"></i>
+        </div>
+        <div class="state-content">
+          <h3 class="state-title">Esperando confirmación</h3>
+          <p class="state-text">Completá la verificación biométrica desde tu celular. Esta página se actualizará automáticamente cuando termines.</p>
+          <div class="review-autoupdate">
+            <span class="review-autoupdate-dot" aria-hidden="true"></span>
+            <span>Esperando resultado…</span>
+          </div>
+        </div>
       </div>
 
       <!-- Estado: aprobada -->
@@ -176,7 +191,7 @@
 
       <div class="tramite-footer" id="tramite-footer" hidden>
         <button class="btn btn-primary" id="continue-btn">
-          Continuar al Paso 3<i class="bi bi-arrow-right"></i>
+          Continuar con el trámite<i class="bi bi-arrow-right"></i>
         </button>
         <button class="btn btn-ghost" id="retry-btn" hidden>
           <i class="bi bi-arrow-counterclockwise"></i>Reintentar verificación

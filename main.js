@@ -22,9 +22,11 @@ const retryBtn       = document.getElementById("retry-btn")
 const tramiteFooter  = document.getElementById("tramite-footer")
 const statusBadge    = document.getElementById("status-badge")
 const statePending      = document.getElementById("state-pending")
+const stateWaiting      = document.getElementById("state-waiting")
 const stateApproved     = document.getElementById("state-approved")
 const stateRejected     = document.getElementById("state-rejected")
 const stateManualReview = document.getElementById("state-manual-review")
+const step1             = document.getElementById("step-1")
 const step2             = document.getElementById("step-2")
 const step3             = document.getElementById("step-3")
 
@@ -40,6 +42,7 @@ function clearCurrentSession() {
 function openModal() {
   modal.hidden = false
   document.body.classList.add("modal-open")
+  setWaiting()
 
   if (ATM_API_KEY) {
     vmodalManual.hidden = true
@@ -187,6 +190,27 @@ function stopPolling() {
 }
 
 // ─── State transitions ────────────────────────────────────────────
+function setWaiting() {
+  statusBadge.className = "badge badge-processing"
+  statusBadge.innerHTML = '<span class="badge-dot"></span> En proceso'
+
+  step1.className = "step-node step-done"
+  step1.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step2.className = "step-node step-active"
+  step2.querySelector(".step-circle").textContent = "2"
+  step3.className = "step-node"
+  step3.querySelector(".step-circle").textContent = "3"
+
+  statePending.hidden      = true
+  stateWaiting.hidden      = false
+  stateApproved.hidden     = true
+  stateRejected.hidden     = true
+  stateManualReview.hidden = true
+  tramiteFooter.hidden     = true
+  continueBtn.hidden       = true
+  retryBtn.hidden          = true
+}
+
 function setApproved(detail) {
   const ocr      = detail?.ocrResult  ?? {}
   const bio      = detail?.biometryResult ?? {}
@@ -209,12 +233,15 @@ function setApproved(detail) {
   statusBadge.className = "badge badge-approved"
   statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Aprobada'
 
+  step1.className = "step-node step-done"
+  step1.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
   step2.className = "step-node step-done"
   step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
   step3.className = "step-node step-active"
   step3.querySelector(".step-circle").textContent = "3"
 
   statePending.hidden      = true
+  stateWaiting.hidden      = true
   stateApproved.hidden     = false
   stateRejected.hidden     = true
   stateManualReview.hidden = true
@@ -230,12 +257,15 @@ function setRejected(detail) {
   statusBadge.className = "badge badge-rejected"
   statusBadge.innerHTML = '<i class="bi bi-x-circle-fill"></i> Rechazada'
 
-  step2.className = "step-node step-rejected"
-  step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-x-lg"></i>'
-  step3.className = "step-node step-active"
-  step3.querySelector(".step-circle").textContent = "3"
+  step1.className = "step-node step-done"
+  step1.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step2.className = "step-node step-done"
+  step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step3.className = "step-node step-rejected"
+  step3.querySelector(".step-circle").innerHTML = '<i class="bi bi-x-lg"></i>'
 
   statePending.hidden      = true
+  stateWaiting.hidden      = true
   stateApproved.hidden     = true
   stateRejected.hidden     = false
   stateManualReview.hidden = true
@@ -248,12 +278,15 @@ function setManualReview() {
   statusBadge.className = "badge badge-manual-review"
   statusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> En revisión'
 
-  step2.className = "step-node step-warning"
-  step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-hourglass-split"></i>'
-  step3.className = "step-node step-active"
-  step3.querySelector(".step-circle").textContent = "3"
+  step1.className = "step-node step-done"
+  step1.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step2.className = "step-node step-done"
+  step2.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
+  step3.className = "step-node step-warning"
+  step3.querySelector(".step-circle").innerHTML = '<i class="bi bi-hourglass-split"></i>'
 
   statePending.hidden      = true
+  stateWaiting.hidden      = true
   stateApproved.hidden     = true
   stateRejected.hidden     = true
   stateManualReview.hidden = false
@@ -269,12 +302,15 @@ function resetToPending() {
   statusBadge.className = "badge badge-pending"
   statusBadge.innerHTML = '<span class="badge-dot"></span> Pendiente'
 
-  step2.className = "step-node step-active"
+  step1.className = "step-node step-active"
+  step1.querySelector(".step-circle").textContent = "1"
+  step2.className = "step-node"
   step2.querySelector(".step-circle").textContent = "2"
   step3.className = "step-node"
   step3.querySelector(".step-circle").textContent = "3"
 
   statePending.hidden      = false
+  stateWaiting.hidden      = true
   stateApproved.hidden     = true
   stateRejected.hidden     = true
   stateManualReview.hidden = true
@@ -291,20 +327,24 @@ function formatDni(raw) {
 }
 
 // ─── Event listeners ──────────────────────────────────────────────
+function userCloseModal() {
+  const wasWaiting = !stateWaiting.hidden
+  closeModal()
+  if (wasWaiting) resetToPending()
+}
+
 startBtn.addEventListener("click", openModal)
 retryBtn.addEventListener("click", openModal)
 
-vmodalClose.addEventListener("click", closeModal)
-vmodalBackdrop.addEventListener("click", closeModal)
+vmodalClose.addEventListener("click", userCloseModal)
+vmodalBackdrop.addEventListener("click", userCloseModal)
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modal.hidden) closeModal()
+  if (e.key === "Escape" && !modal.hidden) userCloseModal()
 })
 
 manualDoneBtn.addEventListener("click", () => {
   closeModal()
-  statusBadge.className = "badge badge-processing"
-  statusBadge.innerHTML = '<span class="badge-dot"></span> En proceso'
 })
 
 // WC CustomEvents — composed:true + bubbles:true → reach document
