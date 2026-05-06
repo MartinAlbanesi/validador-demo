@@ -1,14 +1,23 @@
 /**
- * Portal ATM — main.js
+ * Portal ATM — main.js (post-migración a embed thin)
  *
- * State machine: "pending" | "approved" | "rejected" | "manual_review"
- * Modal lifecycle is independent of portal state.
+ * Responsabilidades del host (este archivo):
+ *  - Pedir session_id al backend (Vercel Function /api/crear-sesion)
+ *  - Pasarlo al <validador-biometrico> y abrirlo
+ *  - Escuchar eventos del embed y mover la UI del portal
+ *  - En approved, fetch PII a /api/sesion-detalle (server-side con API key)
+ *  - Si el usuario minimiza el modal antes de un terminal: state-waiting +
+ *    polling host-side al endpoint público (el embed paró el suyo)
+ *  - Si llega manual_review: state-manual-review + polling cada 10s
+ *    esperando aprobación admin (también host-side)
+ *  - Si el usuario vuelve desde mobile con ?validation_status=... en la URL,
+ *    aplicar ese estado directamente (skippea polling)
+ *
+ * El embed maneja: modal + QR + polling activo + detección mobile + eventos.
  */
 
 // ─── Configuration ────────────────────────────────────────────────
-const ATM_API_KEY         = "" // Set when API key is available
-const API_BASE            = "https://api-validador-atm.duckdns.org/api/v1"
-const MOBILE_URL_FALLBACK = "https://validador-atm.duckdns.org/"
+const API_BASE = "https://api-validador-atm.duckdns.org/api/v1"
 const VALIDATION_RETURN_PARAMS = [
   "validation_status",
   "validation_error",
@@ -20,16 +29,12 @@ const VALIDATION_RETURN_PARAMS = [
 ]
 
 // ─── Element refs ─────────────────────────────────────────────────
-const modal          = document.getElementById("validator-modal")
-const vmodalBackdrop = document.getElementById("vmodal-backdrop")
-const vmodalClose    = document.getElementById("vmodal-close")
-const vmodalManual   = document.getElementById("vmodal-manual")
-const manualDoneBtn  = document.getElementById("manual-done-btn")
-const startBtn       = document.getElementById("start-btn")
-const continueBtn    = document.getElementById("continue-btn")
-const retryBtn       = document.getElementById("retry-btn")
-const tramiteFooter  = document.getElementById("tramite-footer")
-const statusBadge    = document.getElementById("status-badge")
+const vb              = document.getElementById("the-validator")
+const startBtn        = document.getElementById("start-btn")
+const continueBtn     = document.getElementById("continue-btn")
+const retryBtn        = document.getElementById("retry-btn")
+const tramiteFooter   = document.getElementById("tramite-footer")
+const statusBadge     = document.getElementById("status-badge")
 const statePending      = document.getElementById("state-pending")
 const stateWaiting      = document.getElementById("state-waiting")
 const stateApproved     = document.getElementById("state-approved")
@@ -40,185 +45,170 @@ const step2             = document.getElementById("step-2")
 const step3             = document.getElementById("step-3")
 
 // ─── Runtime state ────────────────────────────────────────────────
-let pollInterval     = null
 let currentSessionId = null
+let hostPollTimer    = null
 
-function clearCurrentSession() {
-  currentSessionId = null
-}
-
+// ─── Helpers ──────────────────────────────────────────────────────
 function getPortalReturnUrl() {
+  // URL del portal sin params de validación — para que el SPA mobile
+  // sepa a dónde volver cuando termine.
   const url = new URL(window.location.href)
-  VALIDATION_RETURN_PARAMS.forEach((param) => url.searchParams.delete(param))
+  VALIDATION_RETURN_PARAMS.forEach((p) => url.searchParams.delete(p))
   return url.toString()
 }
 
-function buildMobileRedirectUrl(url) {
-  try {
-    const targetUrl = new URL(url, window.location.href)
-    targetUrl.searchParams.set("return_url", getPortalReturnUrl())
-    return targetUrl.toString()
-  } catch (err) {
-    console.warn("[Portal] Could not append return_url to mobile redirect:", err)
-    return url
+function formatDni(raw) {
+  if (!raw) return "—"
+  const d = String(raw).replace(/\D/g, "")
+  return d.length === 8 ? d.replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") : d
+}
+
+function stopHostPolling() {
+  if (hostPollTimer !== null) {
+    clearInterval(hostPollTimer)
+    hostPollTimer = null
   }
 }
 
-// ─── Modal ────────────────────────────────────────────────────────
-function openModal() {
-  modal.hidden = false
-  document.body.classList.add("modal-open")
-  setWaiting()
-
-  if (ATM_API_KEY) {
-    vmodalManual.hidden = true
-    createSessionAndPoll()
-  } else {
-    vmodalManual.hidden = false
-    setWcMobileUrl(MOBILE_URL_FALLBACK)
+async function fetchSessionDetail(sessionId) {
+  try {
+    const r = await fetch(`/api/sesion-detalle?session_id=${encodeURIComponent(sessionId)}`)
+    if (!r.ok) return {}
+    const d = await r.json()
+    return {
+      ocrResult: d.dni_extracted ?? {},
+      biometryResult: { liveness_score: d.scores?.liveness_score },
+    }
+  } catch {
+    return {}
   }
 }
 
-function closeModal(options = {}) {
-  const { stopActivePolling = true, clearSession = true } = options
-  modal.hidden = true
-  document.body.classList.remove("modal-open")
-  if (stopActivePolling) stopPolling()
-  if (clearSession) clearCurrentSession()
-}
-
-// ─── WC attribute helper ──────────────────────────────────────────
-function setWcMobileUrl(url) {
-  const wc = document.getElementById("the-validator")
-  if (!wc) return
-
-  wc.setAttribute("return-url", getPortalReturnUrl())
-  wc.setAttribute("mobile-url", buildMobileRedirectUrl(url))
-}
-
-// ─── Integration API + polling ────────────────────────────────────
-async function createSessionAndPoll() {
+// ─── Inicio del flujo ─────────────────────────────────────────────
+async function iniciarValidacion() {
+  startBtn.disabled = true
   try {
-    const res = await fetch(`${API_BASE}/integration/sessions`, {
+    const r = await fetch("/api/crear-sesion", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": ATM_API_KEY,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        external_id: `portal-demo-${Date.now()}`,
-        // El portal mock muestra "Juan Pérez · DNI 28.543.671" — mandamos
-        // ese DNI para que el cross-check del backend tenga algo contra qué
-        // comparar. En producción real, ATM lo tomaría del trámite del
-        // contribuyente (no hardcodeado). El validador requiere `dni` o
-        // `cuit` (al menos uno) — sin eso devuelve 422.
         dni: "28543671",
-        callback_url: "https://validador-atm.duckdns.org/webhook",
-        expires_in_minutes: 30,
+        return_url: getPortalReturnUrl(),
       }),
     })
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-    const data = await res.json()
-    currentSessionId = data.session_id
-    setWcMobileUrl(data.validator_url)
-    startPolling(data.session_id)
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}))
+      console.error("[Portal] crear-sesion falló:", r.status, err)
+      setRejected({ error: "No se pudo iniciar la verificación. Intentá de nuevo." })
+      return
+    }
+    const { session_id } = await r.json()
+    currentSessionId = session_id
+    vb.setAttribute("session-id", session_id)
+    setWaiting()
+    vb.open()
   } catch (err) {
-    console.error("[Portal] Session creation failed — falling back to manual:", err)
-    vmodalManual.hidden = false
-    setWcMobileUrl(MOBILE_URL_FALLBACK)
+    console.error("[Portal] crear-sesion error:", err)
+    setRejected({ error: "Error de red. Verificá tu conexión." })
+  } finally {
+    startBtn.disabled = false
   }
 }
 
-function startPolling(sessionId) {
-  currentSessionId = sessionId
-  stopPolling()
-  pollInterval = setInterval(async () => {
+// ─── Polling host-side (cuando el embed dejó de pollear) ──────────
+// Necesario en dos casos:
+//  (1) Usuario cerró el modal antes de un estado terminal — el embed paró,
+//      pero la sesión sigue activa y el polling debe continuar en background.
+//  (2) Llegó manual_review — el embed considera eso terminal, pero el demo
+//      quiere seguir esperando por si el admin aprueba después.
+function startHostPolling(sessionId, intervalMs) {
+  stopHostPolling()
+  hostPollTimer = setInterval(async () => {
     try {
-      const res = await fetch(`${API_BASE}/integration/sessions/${sessionId}/status`)
-      if (!res.ok) return
-      const { status, rejection_code } = await res.json()
+      const r = await fetch(`${API_BASE}/integration/sessions/${sessionId}/status`)
+      if (!r.ok) return
+      const { status, rejection_code } = await r.json()
 
       if (status === "approved") {
-        stopPolling()
-        let detail = {}
-        try {
-          const detailRes = await fetch(`${API_BASE}/integration/sessions/${sessionId}`, {
-            headers: { "X-API-Key": ATM_API_KEY },
-          })
-          if (detailRes.ok) {
-            const d = await detailRes.json()
-            detail = {
-              ocrResult: d.dni_extracted,
-              biometryResult: { liveness_score: d.scores?.liveness_score },
-            }
-          }
-        } catch { /* detail unavailable — setApproved handles nulls */ }
-        closeModal()
+        stopHostPolling()
+        const detail = await fetchSessionDetail(sessionId)
+        currentSessionId = null
         setApproved(detail)
-
+      } else if (status === "rejected") {
+        stopHostPolling()
+        currentSessionId = null
+        if (rejection_code === "expired") {
+          setRejected({ error: "Tu sesión expiró. Iniciá la verificación de nuevo." })
+        } else {
+          setRejected({
+            error: `Verificación rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
+          })
+        }
       } else if (status === "manual_review") {
-        closeModal({ stopActivePolling: false, clearSession: false })
+        // Si veníamos de pending → cambiar a manual_review y bajar el ritmo.
+        if (!stateManualReview.hidden) return
         setManualReview()
-        startReviewPolling(sessionId)
-      } else if (status === "rejected") {
-        stopPolling()
-        closeModal()
-        setRejected({
-          error: `Verificación rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
-        })
+        startHostPolling(sessionId, 10000)
       }
     } catch (err) {
-      console.error("[Portal] Polling error:", err)
+      console.error("[Portal] polling host error:", err)
     }
-  }, 3000)
+  }, intervalMs)
 }
 
-function startReviewPolling(sessionId) {
-  currentSessionId = sessionId
-  stopPolling()
-  pollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/integration/sessions/${sessionId}/status`)
-      if (!res.ok) return
-      const { status, rejection_code } = await res.json()
+// ─── Listeners del embed ──────────────────────────────────────────
+vb.addEventListener("validation:pending", (e) => {
+  console.debug("[Portal] pending", e.detail)
+})
 
-      if (status === "approved") {
-        stopPolling()
-        let detail = {}
-        try {
-          const detailRes = await fetch(`${API_BASE}/integration/sessions/${sessionId}`, {
-            headers: { "X-API-Key": ATM_API_KEY },
-          })
-          if (detailRes.ok) {
-            const d = await detailRes.json()
-            detail = {
-              ocrResult: d.dni_extracted,
-              biometryResult: { liveness_score: d.scores?.liveness_score },
-            }
-          }
-        } catch { /* detail unavailable â€” setApproved handles nulls */ }
-        clearCurrentSession()
-        setApproved(detail)
-      } else if (status === "rejected") {
-        stopPolling()
-        clearCurrentSession()
-        setRejected({
-          error: `VerificaciÃ³n rechazada${rejection_code ? ` (${rejection_code})` : ""}.`,
-        })
-      }
-    } catch (err) {
-      console.error("[Portal] Review polling error:", err)
-    }
-  }, 10000)
-}
+vb.addEventListener("validation:approved", async (e) => {
+  console.debug("[Portal] approved", e.detail)
+  stopHostPolling()
+  const detail = await fetchSessionDetail(e.detail.session_id)
+  currentSessionId = null
+  setApproved(detail)
+})
 
-function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
-}
+vb.addEventListener("validation:rejected", (e) => {
+  console.debug("[Portal] rejected", e.detail)
+  stopHostPolling()
+  currentSessionId = null
+  const code = e.detail.rejection_code
+  setRejected({ error: `Verificación rechazada${code ? ` (${code})` : ""}.` })
+})
 
-// ─── State transitions ────────────────────────────────────────────
+vb.addEventListener("validation:expired", (e) => {
+  console.debug("[Portal] expired", e.detail)
+  stopHostPolling()
+  currentSessionId = null
+  setRejected({ error: "Tu sesión expiró. Iniciá la verificación de nuevo." })
+})
+
+vb.addEventListener("validation:manual_review", (e) => {
+  console.debug("[Portal] manual_review", e.detail)
+  // El embed paró su polling. Mostramos el estado y arrancamos polling
+  // host-side cada 10s por si el admin aprueba luego.
+  setManualReview()
+  startHostPolling(e.detail.session_id, 10000)
+})
+
+vb.addEventListener("validation:error", (e) => {
+  console.error("[Portal] error", e.detail)
+  // No paramos la sesión — el usuario puede llamar vb.retry() o reabrir.
+  // Mostramos el estado pero no resetTo pending.
+})
+
+vb.addEventListener("validation:dismissed", (e) => {
+  console.debug("[Portal] dismissed", e.detail)
+  // Usuario cerró el modal antes de un terminal — el embed paró su polling
+  // pero la sesión sigue activa en el backend. Mostramos state-waiting y
+  // arrancamos polling host-side al ritmo normal.
+  if (currentSessionId) {
+    startHostPolling(currentSessionId, 5000)
+  }
+})
+
+// ─── State transitions del portal ─────────────────────────────────
 function setWaiting() {
   statusBadge.className = "badge badge-processing"
   statusBadge.innerHTML = '<span class="badge-dot"></span> En proceso'
@@ -324,52 +314,21 @@ function setManualReview() {
   retryBtn.hidden          = true
 }
 
-function resetToPending() {
-  stopPolling()
-  clearCurrentSession()
-
-  statusBadge.className = "badge badge-pending"
-  statusBadge.innerHTML = '<span class="badge-dot"></span> Pendiente'
-
-  step1.className = "step-node step-active"
-  step1.querySelector(".step-circle").textContent = "1"
-  step2.className = "step-node"
-  step2.querySelector(".step-circle").textContent = "2"
-  step3.className = "step-node"
-  step3.querySelector(".step-circle").textContent = "3"
-
-  statePending.hidden      = false
-  stateWaiting.hidden      = true
-  stateApproved.hidden     = true
-  stateRejected.hidden     = true
-  stateManualReview.hidden = true
-  tramiteFooter.hidden     = true
-  continueBtn.hidden       = true
-  retryBtn.hidden          = true
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────
-function formatDni(raw) {
-  if (!raw) return "—"
-  const d = String(raw).replace(/\D/g, "")
-  return d.length === 8 ? d.replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") : d
-}
-
+// ─── Mobile flow: el SPA vuelve al portal con params en la URL ────
 function applyReturnedValidationState() {
   const url = new URL(window.location.href)
   const status = url.searchParams.get("validation_status")
   if (!status) return
 
-  stopPolling()
-  clearCurrentSession()
-  closeModal()
+  stopHostPolling()
+  currentSessionId = null
 
   const detail = {
     ocrResult: {
-      nombre: url.searchParams.get("validation_name") ?? "",
-      apellido: url.searchParams.get("validation_last_name") ?? "",
-      dni_number: url.searchParams.get("validation_dni") ?? "",
-      fecha_nacimiento: url.searchParams.get("validation_dob") ?? "",
+      nombre:           url.searchParams.get("validation_name")      ?? "",
+      apellido:         url.searchParams.get("validation_last_name") ?? "",
+      dni_number:       url.searchParams.get("validation_dni")       ?? "",
+      fecha_nacimiento: url.searchParams.get("validation_dob")       ?? "",
     },
     biometryResult: {},
   }
@@ -390,44 +349,13 @@ function applyReturnedValidationState() {
     })
   }
 
-  VALIDATION_RETURN_PARAMS.forEach((param) => url.searchParams.delete(param))
+  // Limpiar los params para que un refresh no re-aplique el estado.
+  VALIDATION_RETURN_PARAMS.forEach((p) => url.searchParams.delete(p))
   window.history.replaceState({}, "", url.toString())
 }
 
-// ─── Event listeners ──────────────────────────────────────────────
-function userCloseModal() {
-  const wasWaiting = !stateWaiting.hidden
-  closeModal()
-  if (wasWaiting) resetToPending()
-}
-
+// ─── Bootstrap ────────────────────────────────────────────────────
 applyReturnedValidationState()
 
-startBtn.addEventListener("click", openModal)
-retryBtn.addEventListener("click", openModal)
-
-vmodalClose.addEventListener("click", userCloseModal)
-vmodalBackdrop.addEventListener("click", userCloseModal)
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modal.hidden) userCloseModal()
-})
-
-manualDoneBtn.addEventListener("click", () => {
-  closeModal()
-})
-
-// WC CustomEvents — composed:true + bubbles:true → reach document
-document.addEventListener("validation-success", (e) => {
-  closeModal()
-  setApproved(e.detail)
-})
-
-document.addEventListener("validation-error", (e) => {
-  closeModal()
-  setRejected(e.detail)
-})
-
-document.addEventListener("validation-restart", () => {
-  resetToPending()
-})
+startBtn.addEventListener("click", iniciarValidacion)
+retryBtn.addEventListener("click", iniciarValidacion)

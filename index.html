@@ -202,30 +202,12 @@
   </main>
 </div><!-- /portal-body -->
 
-<!-- ═══ MODAL ════════════════════════════════════════════════════════ -->
-<div class="vmodal" id="validator-modal" hidden>
-  <div class="vmodal-backdrop" id="vmodal-backdrop"></div>
-  <div class="vmodal-panel">
-    <button class="vmodal-close" id="vmodal-close" aria-label="Cerrar verificación">
-      <i class="bi bi-x-lg"></i>
-    </button>
-    <div id="wc-host">
-      <validador-biometrico
-        id="the-validator"
-        api-url="https://api-validador-atm.duckdns.org/api/v1"
-        mobile-url="https://validador-atm.duckdns.org/"
-      ></validador-biometrico>
-    </div>
-    <div class="vmodal-manual" id="vmodal-manual" hidden>
-      <p>¿Completaste la verificación en tu celular?</p>
-      <button class="btn btn-ghost btn-sm" id="manual-done-btn">
-        <i class="bi bi-check2"></i>Ya completé en mi celular
-      </button>
-    </div>
-  </div>
-</div>
+<!-- ═══ EMBED ════════════════════════════════════════════════════════ -->
+<!-- El componente trae su propio modal con QR + polling + eventos.
+     El integrador solo lo monta y escucha eventos — no maneja modal lifecycle. -->
+<validador-biometrico id="the-validator"></validador-biometrico>
 
-<script type="module" src="./vendor/validador-biometrico.js"></script>
+<script src="https://validador-atm.duckdns.org/embed/embed-v1.js" defer></script>
 <script src="main.js" defer></script>
 
 </body>
