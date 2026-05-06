@@ -34,7 +34,13 @@ export default async function handler(req, res) {
   const returnUrl = typeof body.return_url === "string" && body.return_url.trim()
     ? body.return_url.trim()
     : undefined
-  const externalId = `portal-demo-${Date.now()}`
+  // El frontend manda un external_id estable via sessionStorage para
+  // que reabrir el modal reuse la sesion pending existente (en lugar de
+  // crear una nueva por click — antes ensuciaba el admin con N rows
+  // vacias). Si no viene, fallback al timestamp tipo legacy.
+  const externalId = typeof body.external_id === "string" && body.external_id.trim()
+    ? body.external_id.trim()
+    : `portal-demo-${Date.now()}`
 
   // El return_url se persiste en la sesión del backend. El SPA lo lee
   // desde la sesión cargada y redirige al integrador después de que el
@@ -53,7 +59,11 @@ export default async function handler(req, res) {
     external_id: externalId,
     dni,
     callback_url: callbackUrl,
-    expires_in_minutes: 30,
+    // TTL corto para el demo: las sesiones abandonadas se transicionan
+    // a rejected+expired por el cron del back en pocos minutos, en lugar
+    // de quedar 30 min de ruido en el admin. Un integrador real con
+    // trámites largos (firma offline, etc.) usa el default de 30 min.
+    expires_in_minutes: 5,
   }
   if (returnUrl) sessionPayload.return_url = returnUrl
 

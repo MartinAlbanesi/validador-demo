@@ -57,6 +57,27 @@ function getPortalReturnUrl() {
   return url.toString()
 }
 
+// external_id estable por sesión de browser. Si el usuario cierra el
+// modal sin completar y vuelve a hacer click, reusamos la misma sesión
+// pendiente del back (idempotencia por external_id) en lugar de crear
+// una nueva — antes ensuciaba el admin con N rows vacíos pending.
+// Cuando la validación llega a un estado terminal, rotamos para que
+// el próximo "Iniciar" cree una sesión limpia.
+const EXTERNAL_ID_KEY = "validador_external_id"
+
+function getOrCreateExternalId() {
+  let id = sessionStorage.getItem(EXTERNAL_ID_KEY)
+  if (!id) {
+    id = `portal-demo-${Date.now()}`
+    sessionStorage.setItem(EXTERNAL_ID_KEY, id)
+  }
+  return id
+}
+
+function rotateExternalId() {
+  sessionStorage.removeItem(EXTERNAL_ID_KEY)
+}
+
 function formatDni(raw) {
   if (!raw) return "—"
   const d = String(raw).replace(/\D/g, "")
@@ -85,20 +106,36 @@ async function fetchSessionDetail(sessionId) {
 }
 
 // ─── Inicio del flujo ─────────────────────────────────────────────
+async function crearSesion(externalId) {
+  return fetch("/api/crear-sesion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dni: "28543671",
+      external_id: externalId,
+      return_url: getPortalReturnUrl(),
+    }),
+  })
+}
+
 async function iniciarValidacion() {
   startBtn.disabled = true
   try {
-    const r = await fetch("/api/crear-sesion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        dni: "28543671",
-        return_url: getPortalReturnUrl(),
-      }),
-    })
+    let externalId = getOrCreateExternalId()
+    let r = await crearSesion(externalId)
+
+    // 409: el back tiene una sesion previa con este external_id que ya
+    // se completo o expiro. Rotamos y reintentamos con uno nuevo.
+    if (r.status === 409) {
+      console.debug("[Portal] external_id consumido, rotando")
+      rotateExternalId()
+      externalId = getOrCreateExternalId()
+      r = await crearSesion(externalId)
+    }
+
     if (!r.ok) {
       const err = await r.json().catch(() => ({}))
-      console.error("[Portal] crear-sesion falló:", r.status, err)
+      console.error("[Portal] crear-sesion fallo:", r.status, err)
       setRejected({ error: "No se pudo iniciar la verificación. Intentá de nuevo." })
       return
     }
@@ -164,6 +201,7 @@ vb.addEventListener("validation:pending", (e) => {
 vb.addEventListener("validation:approved", async (e) => {
   console.debug("[Portal] approved", e.detail)
   stopHostPolling()
+  rotateExternalId() // sesión consumida — proximo "Iniciar" usa una nueva
   const detail = await fetchSessionDetail(e.detail.session_id)
   currentSessionId = null
   setApproved(detail)
@@ -172,6 +210,7 @@ vb.addEventListener("validation:approved", async (e) => {
 vb.addEventListener("validation:rejected", (e) => {
   console.debug("[Portal] rejected", e.detail)
   stopHostPolling()
+  rotateExternalId()
   currentSessionId = null
   const code = e.detail.rejection_code
   setRejected({ error: `Verificación rechazada${code ? ` (${code})` : ""}.` })
@@ -180,6 +219,7 @@ vb.addEventListener("validation:rejected", (e) => {
 vb.addEventListener("validation:expired", (e) => {
   console.debug("[Portal] expired", e.detail)
   stopHostPolling()
+  rotateExternalId()
   currentSessionId = null
   setRejected({ error: "Tu sesión expiró. Iniciá la verificación de nuevo." })
 })
@@ -188,6 +228,8 @@ vb.addEventListener("validation:manual_review", (e) => {
   console.debug("[Portal] manual_review", e.detail)
   // El embed paró su polling. Mostramos el estado y arrancamos polling
   // host-side cada 10s por si el admin aprueba luego.
+  // No rotamos external_id acá: la sesión sigue "viva" esperando aprobación
+  // admin — si el usuario cierra y reabre, debería reusar esta misma.
   setManualReview()
   startHostPolling(e.detail.session_id, 10000)
 })
@@ -321,6 +363,12 @@ function applyReturnedValidationState() {
   if (!status) return
 
   stopHostPolling()
+  // El SPA mobile termino y volvio al portal: la sesion del external_id
+  // actual ya esta consumida (approved/rejected/etc). Rotamos para que
+  // un "Iniciar" siguiente use uno nuevo y no chocque con 409.
+  if (status !== "manual_review" && status !== "pending") {
+    rotateExternalId()
+  }
   currentSessionId = null
 
   const detail = {
