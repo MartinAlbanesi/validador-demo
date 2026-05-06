@@ -40,10 +40,19 @@ export default async function handler(req, res) {
   // desde la sesión cargada y redirige al integrador después de que el
   // usuario complete el flujo en mobile (sin pasarlo por URL params del
   // QR — más limpio y respeta la allowlist del backend).
+  // El callback_url apunta a nuestra Vercel Function api/webhook.js que
+  // valida HMAC y devuelve 200. Antes apuntaba a un endpoint inexistente
+  // y los webhooks quedaban dead en webhook_deliveries del back.
+  // Construimos absoluto desde los headers del request — Vercel routea
+  // según Host header, así funciona tanto en deploys preview como prod.
+  const host = req.headers["x-forwarded-host"] || req.headers.host
+  const proto = req.headers["x-forwarded-proto"] || "https"
+  const callbackUrl = `${proto}://${host}/api/webhook`
+
   const sessionPayload = {
     external_id: externalId,
     dni,
-    callback_url: "https://validador-atm.duckdns.org/webhook",
+    callback_url: callbackUrl,
     expires_in_minutes: 30,
   }
   if (returnUrl) sessionPayload.return_url = returnUrl
