@@ -86,6 +86,31 @@
     .resultado dl { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
     .resultado dt { color: #5b6878; }
     .resultado dd { margin: 0; color: #1a1f29; font-weight: 500; }
+
+    .json-blocks { display: none; margin-top: 24px; text-align: left; }
+    .json-blocks h4 {
+      margin: 16px 0 6px;
+      font-size: 11px;
+      color: #5b6878;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+    }
+    .json-blocks pre {
+      margin: 0 0 12px;
+      background: #0f1419;
+      color: #e6e9ef;
+      padding: 14px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+      font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+    }
+    .json-blocks .key { color: #93c5fd; }
+    .json-blocks .str { color: #86efac; }
+    .json-blocks .num { color: #fbbf24; }
+    .json-blocks .null { color: #fca5a5; }
   </style>
 </head>
 <body>
@@ -134,7 +159,7 @@
       (vía fetch a <code>/api/sesion-detalle</code>):
     </div>
     <div id="resultado" class="resultado">
-      <h3>Datos del trámite</h3>
+      <h3>Datos del trámite (renderizados en la UI)</h3>
       <dl>
         <dt>Nombre completo</dt><dd id="r-nombre">—</dd>
         <dt>N.º de DNI</dt><dd id="r-dni">—</dd>
@@ -144,6 +169,15 @@
         <dt>Validado el</dt><dd id="r-fecha">—</dd>
       </dl>
     </div>
+
+    <div id="json-blocks" class="json-blocks">
+      <h4>1. Lo que recibió el browser del evento del embed (window.mostrarResultado(detail))</h4>
+      <pre id="json-detail"></pre>
+
+      <h4>2. Lo que recibió el browser del fetch a /api/sesion-detalle (JSON del backend del integrador)</h4>
+      <pre id="json-data"></pre>
+    </div>
+
     <div id="estado-err" class="estado err"></div>
   </div>
 
@@ -187,6 +221,11 @@
 
         document.getElementById("estado-ok").style.display = "block"
         document.getElementById("resultado").style.display = "block"
+
+        // Mostrar el JSON crudo de las 2 fuentes (educativo para demo)
+        document.getElementById("json-detail").textContent = JSON.stringify(detail, null, 2)
+        document.getElementById("json-data").textContent = JSON.stringify(data, null, 2)
+        document.getElementById("json-blocks").style.display = "block"
       } catch (err) {
         console.error("[demo] no se pudo obtener detalle:", err)
         const el = document.getElementById("estado-err")
