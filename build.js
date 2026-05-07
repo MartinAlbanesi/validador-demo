@@ -16,6 +16,7 @@ fs.mkdirSync(OUT)
 fs.mkdirSync(path.join(OUT, "assets"))
 
 fs.copyFileSync("index.html",          path.join(OUT, "index.html"))
+fs.copyFileSync("declarativo.html",    path.join(OUT, "declarativo.html"))
 fs.copyFileSync("styles.css",          path.join(OUT, "styles.css"))
 fs.copyFileSync("main.js",             path.join(OUT, "main.js"))
 fs.copyFileSync("assets/LOGO-ATM.png", path.join(OUT, "assets/LOGO-ATM.png"))
