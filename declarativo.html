@@ -69,8 +69,10 @@
       border-radius: 8px;
       font-size: 14px;
     }
-    .estado.ok { display: block; background: #dcfce7; color: #166534; }
-    .estado.err { display: block; background: #fee2e2; color: #991b1b; }
+    /* Solo aplican colores — la visibilidad la controla JS via style.display
+       (sin esto los carteles se mostraban siempre por especificidad CSS). */
+    .estado.ok { background: #dcfce7; color: #166534; }
+    .estado.err { background: #fee2e2; color: #991b1b; }
     .resultado {
       display: none;
       margin-top: 16px;
