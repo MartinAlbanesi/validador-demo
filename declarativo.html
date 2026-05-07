@@ -120,7 +120,10 @@
     <button data-validador-biometrico
             data-session-url="/api/crear-sesion"
             data-on-approved="mostrarResultado"
-            data-on-rejected="manejarRechazo">
+            data-on-rejected="manejarRechazo"
+            data-on-manual-review="manejarRevisionManual"
+            data-on-expired="manejarExpirado"
+            data-on-error="manejarError">
       Validar identidad
     </button>
 
@@ -190,12 +193,33 @@
       }
     }
 
-    // Handler global del callback declarativo data-on-rejected="manejarRechazo"
+    // Handlers globales de los demás callbacks declarativos.
+    // Cualquier estado terminal del flujo del embed se refleja acá:
+    function mostrarMensaje(texto, tipo) {
+      const el = document.getElementById(tipo === "ok" ? "estado-ok" : "estado-err")
+      el.textContent = texto
+      el.style.display = "block"
+    }
+
     window.manejarRechazo = function (detail) {
       const code = detail?.rejection_code
-      const el = document.getElementById("estado-err")
-      el.textContent = `Validación rechazada${code ? ` (${code})` : ""}.`
-      el.style.display = "block"
+      mostrarMensaje(`Validación rechazada${code ? ` (${code})` : ""}.`, "err")
+    }
+
+    window.manejarRevisionManual = function (detail) {
+      mostrarMensaje(
+        "Tu validación quedó en revisión manual. Un administrador la aprobará pronto y recibirás una notificación.",
+        "err",
+      )
+    }
+
+    window.manejarExpirado = function () {
+      mostrarMensaje("Tu sesión expiró. Iniciá la validación de nuevo.", "err")
+    }
+
+    window.manejarError = function (detail) {
+      const reason = detail?.reason ?? "unknown"
+      mostrarMensaje(`Hubo un problema técnico (${reason}). Reintentá en unos segundos.`, "err")
     }
   </script>
 </body>
