@@ -71,6 +71,19 @@
     }
     .estado.ok { display: block; background: #dcfce7; color: #166534; }
     .estado.err { display: block; background: #fee2e2; color: #991b1b; }
+    .resultado {
+      display: none;
+      margin-top: 16px;
+      padding: 20px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .resultado h3 { margin: 0 0 12px; font-size: 16px; color: #166534; }
+    .resultado dl { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
+    .resultado dt { color: #5b6878; }
+    .resultado dd { margin: 0; color: #1a1f29; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -87,22 +100,44 @@
 
 &lt;button data-validador-biometrico
         data-session-url="/api/crear-sesion"
-        data-on-approved="/declarativo.html?ok=1"&gt;
+        data-on-approved="mostrarResultado"&gt;
   Validar identidad
-&lt;/button&gt;</pre>
+&lt;/button&gt;
+
+&lt;script&gt;
+  window.mostrarResultado = async (detail) =&gt; {
+    // detail = { session_id, completed_at }
+    // Para mostrar PII en la UI, fetch al backend del integrador:
+    const r = await fetch(`/api/sesion-detalle?session_id=${detail.session_id}`)
+    const data = await r.json()
+    // data.dni_extracted = { nombre, apellido, dni_number, ... }
+    // data.scores = { face_similarity, liveness_score }
+  }
+&lt;/script&gt;</pre>
 
   <p class="label">Probalo</p>
   <div class="demo-area">
     <button data-validador-biometrico
             data-session-url="/api/crear-sesion"
-            data-on-approved="/declarativo.html?ok=1"
+            data-on-approved="mostrarResultado"
             data-on-rejected="manejarRechazo">
       Validar identidad
     </button>
 
     <div id="estado-ok" class="estado ok">
-      ✓ Validación aprobada. En producción real, el integrador persiste el
-      resultado desde el webhook firmado HMAC al backend (no desde el browser).
+      ✓ Validación aprobada. Datos recibidos del backend del integrador
+      (vía fetch a <code>/api/sesion-detalle</code>):
+    </div>
+    <div id="resultado" class="resultado">
+      <h3>Datos del trámite</h3>
+      <dl>
+        <dt>Nombre completo</dt><dd id="r-nombre">—</dd>
+        <dt>N.º de DNI</dt><dd id="r-dni">—</dd>
+        <dt>Fecha nacimiento</dt><dd id="r-dob">—</dd>
+        <dt>Liveness score</dt><dd id="r-liveness">—</dd>
+        <dt>Face similarity</dt><dd id="r-face">—</dd>
+        <dt>Validado el</dt><dd id="r-fecha">—</dd>
+      </dl>
     </div>
     <div id="estado-err" class="estado err"></div>
   </div>
@@ -117,9 +152,42 @@
   </div>
 
   <script>
-    // Detección del redirect de approved (data-on-approved="/declarativo.html?ok=1")
-    if (new URL(location.href).searchParams.get("ok") === "1") {
-      document.getElementById("estado-ok").style.display = "block"
+    // Handler global del callback declarativo data-on-approved="mostrarResultado"
+    // El embed lo ejecuta al recibir validation:approved, con el detail del evento.
+    window.mostrarResultado = async function (detail) {
+      // detail = { session_id, completed_at }
+      // Fetch al backend del integrador para obtener PII (la API key del
+      // validador vive server-side en la Vercel Function, no en el browser).
+      try {
+        const r = await fetch(`/api/sesion-detalle?session_id=${encodeURIComponent(detail.session_id)}`)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const data = await r.json()
+
+        const ocr = data.dni_extracted ?? {}
+        const scores = data.scores ?? {}
+        const fullName = [ocr.nombre, ocr.apellido].filter(Boolean).join(" ") || "—"
+        const dni = (ocr.dni_number ?? "").replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") || "—"
+        const liveness = scores.liveness_score != null ? Math.round(scores.liveness_score * 100) + "%" : "—"
+        const face = scores.face_similarity != null ? scores.face_similarity.toFixed(2) : "—"
+        const fecha = detail.completed_at
+          ? new Date(detail.completed_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+          : "—"
+
+        document.getElementById("r-nombre").textContent = fullName
+        document.getElementById("r-dni").textContent = dni
+        document.getElementById("r-dob").textContent = ocr.fecha_nacimiento ?? "—"
+        document.getElementById("r-liveness").textContent = liveness
+        document.getElementById("r-face").textContent = face
+        document.getElementById("r-fecha").textContent = fecha
+
+        document.getElementById("estado-ok").style.display = "block"
+        document.getElementById("resultado").style.display = "block"
+      } catch (err) {
+        console.error("[demo] no se pudo obtener detalle:", err)
+        const el = document.getElementById("estado-err")
+        el.textContent = "Validación aprobada pero no se pudo obtener el detalle del trámite."
+        el.style.display = "block"
+      }
     }
 
     // Handler global del callback declarativo data-on-rejected="manejarRechazo"
