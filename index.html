@@ -124,7 +124,24 @@
 
       <!-- Estado: pendiente -->
       <div class="tramite-body tramite-body--cta" id="state-pending">
-        <p class="state-hint">Necesitás tu DNI y acceso a la cámara de tu celular.</p>
+        <p class="state-hint">Completá tus datos tal cual figuran en tu DNI antes de iniciar la verificación. Vamos a comparar contra lo que extrae el escáner.</p>
+
+        <form id="datos-form" class="datos-form" autocomplete="off">
+          <div class="datos-form-row">
+            <label for="form-apellido">Apellido <span class="req">*</span></label>
+            <input id="form-apellido" name="apellido" type="text" required maxlength="80" placeholder="Ej: Pérez" />
+          </div>
+          <div class="datos-form-row">
+            <label for="form-nombres">Nombres <span class="req">*</span></label>
+            <input id="form-nombres" name="nombres" type="text" required maxlength="80" placeholder="Ej: Juan Carlos" />
+          </div>
+          <div class="datos-form-row">
+            <label for="form-dni">N.º de DNI <span class="req">*</span></label>
+            <input id="form-dni" name="dni" type="text" required inputmode="numeric" maxlength="8" pattern="\d{7,8}" placeholder="Solo números, sin puntos" />
+          </div>
+          <div id="form-error" class="datos-form-error" hidden></div>
+        </form>
+
         <button class="btn btn-primary btn-cta" id="start-btn">
           <i class="bi bi-fingerprint"></i>Iniciar Verificación Biométrica
         </button>
@@ -171,6 +188,24 @@
         <div class="state-content">
           <h3 class="state-title">Identidad verificada correctamente</h3>
           <p class="state-text">Tu identidad fue validada con éxito. Podés continuar al paso de confirmación.</p>
+
+          <!-- Comparación cruzada: lo que el usuario ingresó al inicio
+               vs lo que el OCR extrajo del DNI físico. Demuestra que el
+               sistema validó identidad, no solo "alguien pasó OCR". -->
+          <div class="cross-check-table" id="cross-check-table">
+            <h4 class="cross-check-title">Comparación con tus datos</h4>
+            <table>
+              <thead>
+                <tr><th>Campo</th><th>Lo que ingresaste</th><th>Lo que extrajo el escáner</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Apellido</td><td id="cc-apellido-in">—</td><td id="cc-apellido-out">—</td><td id="cc-apellido-mark"></td></tr>
+                <tr><td>Nombres</td><td id="cc-nombres-in">—</td><td id="cc-nombres-out">—</td><td id="cc-nombres-mark"></td></tr>
+                <tr><td>DNI</td><td id="cc-dni-in">—</td><td id="cc-dni-out">—</td><td id="cc-dni-mark"></td></tr>
+              </tbody>
+            </table>
+          </div>
+
           <dl class="verification-data">
             <div class="vd-row"><dt>Nombre completo</dt><dd id="vd-name">—</dd></div>
             <div class="vd-row"><dt>N.º de DNI</dt><dd id="vd-dni">—</dd></div>

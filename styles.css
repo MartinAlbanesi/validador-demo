@@ -370,6 +370,94 @@ button { font-family: var(--font-body); cursor: pointer; }
   letter-spacing: 0.01em;
 }
 
+/* ── Datos form (login simulado del usuario) ─────────────────────── */
+.datos-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+}
+.datos-form-row { display: flex; flex-direction: column; gap: 6px; }
+.datos-form label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.datos-form label .req { color: #dc2626; }
+.datos-form input {
+  padding: 10px 14px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text, #111827);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.datos-form input:focus {
+  outline: 0;
+  border-color: var(--primary, #6b2fa0);
+  box-shadow: 0 0 0 3px rgba(107, 47, 160, 0.12);
+}
+.datos-form input:invalid:not(:placeholder-shown) {
+  border-color: #f59e0b;
+}
+.datos-form-error {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+/* ── Cross-check table (lo ingresado vs OCR extrajo) ─────────────── */
+.cross-check-table {
+  margin: 0 0 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.cross-check-title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.cross-check-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cross-check-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #64748b;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cross-check-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #1e293b;
+}
+.cross-check-table tr:last-child td { border-bottom: 0; }
+.cross-check-table td:first-child { font-weight: 600; color: #475569; width: 30%; }
+.cross-check-table td:last-child { text-align: center; width: 24px; font-size: 18px; }
+.cross-check-mark--ok { color: #10b981; }
+.cross-check-mark--fail { color: #ef4444; }
+
 /* ── Verification Data ──────────────────────────────────────────── */
 .verification-data {
   display: grid;

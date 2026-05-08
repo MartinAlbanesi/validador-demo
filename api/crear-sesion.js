@@ -31,6 +31,12 @@ export default async function handler(req, res) {
 
   const body = req.body && typeof req.body === "object" ? req.body : {}
   const dni = typeof body.dni === "string" && body.dni.trim() ? body.dni.trim() : DEFAULT_DNI
+  const apellido = typeof body.apellido === "string" && body.apellido.trim()
+    ? body.apellido.trim()
+    : undefined
+  const nombres = typeof body.nombres === "string" && body.nombres.trim()
+    ? body.nombres.trim()
+    : undefined
   const returnUrl = typeof body.return_url === "string" && body.return_url.trim()
     ? body.return_url.trim()
     : undefined
@@ -66,6 +72,11 @@ export default async function handler(req, res) {
     expires_in_minutes: 5,
   }
   if (returnUrl) sessionPayload.return_url = returnUrl
+  // Si el integrador pasa apellido/nombres, los reenviamos al validador
+  // para que extienda el cross-check más allá del DNI (uppercase + sin
+  // acentos + trim, apellido exacto, nombres por substring).
+  if (apellido) sessionPayload.apellido = apellido
+  if (nombres) sessionPayload.nombres = nombres
 
   let upstream
   try {

@@ -84,6 +84,52 @@ function formatDni(raw) {
   return d.length === 8 ? d.replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") : d
 }
 
+// Normaliza para comparación tolerante (uppercase + sin acentos + trim).
+// Mismo criterio que el back en _normalize_name de tracker.py.
+function normalizeName(value) {
+  if (!value) return ""
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")  // remover diacríticos
+    .toUpperCase()
+    .replace(/[^A-ZÑ ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function renderCrossCheck({ apellidoIn, apellidoOut, nombresIn, nombresOut, dniIn, dniOut }) {
+  // Apellido: match exacto normalizado.
+  const apellidoMatch = normalizeName(apellidoIn) === normalizeName(apellidoOut)
+  // Nombres: substring (uno contiene al otro). Mismo criterio que el back.
+  const nA = normalizeName(nombresIn)
+  const nB = normalizeName(nombresOut)
+  const nombresMatch = !!nA && !!nB && (nA.includes(nB) || nB.includes(nA))
+  // DNI: solo dígitos.
+  const dA = String(dniIn || "").replace(/\D/g, "")
+  const dB = String(dniOut || "").replace(/\D/g, "")
+  const dniMatch = !!dA && dA === dB
+
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text || "—" }
+  const setMark = (id, ok) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.textContent = ok ? "✓" : "✗"
+    el.className = ok ? "cross-check-mark--ok" : "cross-check-mark--fail"
+  }
+
+  set("cc-apellido-in", apellidoIn)
+  set("cc-apellido-out", apellidoOut)
+  setMark("cc-apellido-mark", apellidoMatch)
+
+  set("cc-nombres-in", nombresIn)
+  set("cc-nombres-out", nombresOut)
+  setMark("cc-nombres-mark", nombresMatch)
+
+  set("cc-dni-in", formatDni(dniIn))
+  set("cc-dni-out", formatDni(dniOut))
+  setMark("cc-dni-mark", dniMatch)
+}
+
 function stopHostPolling() {
   if (hostPollTimer !== null) {
     clearInterval(hostPollTimer)
@@ -105,13 +151,57 @@ async function fetchSessionDetail(sessionId) {
   }
 }
 
+// ─── Form de datos del usuario ────────────────────────────────────
+// El usuario completa apellido + nombres + DNI antes de iniciar. Esos
+// datos se mandan al back como expected_*. El cross-check los compara
+// contra lo extraído por OCR. Si NO coinciden ⇒ identity_mismatch.
+const datosForm = document.getElementById("datos-form")
+const formApellido = document.getElementById("form-apellido")
+const formNombres = document.getElementById("form-nombres")
+const formDni = document.getElementById("form-dni")
+const formError = document.getElementById("form-error")
+
+// Snapshot de lo que el usuario ingresó al click — se usa después en la
+// pantalla de éxito para mostrar comparación "vos dijiste vs OCR extrajo".
+let datosIngresados = { apellido: "", nombres: "", dni: "" }
+
+function leerForm() {
+  return {
+    apellido: (formApellido?.value ?? "").trim(),
+    nombres: (formNombres?.value ?? "").trim(),
+    dni: (formDni?.value ?? "").trim().replace(/\D/g, ""),
+  }
+}
+
+function validarForm(datos) {
+  if (!datos.apellido) return "Ingresá tu apellido (tal cual figura en el DNI)."
+  if (!datos.nombres) return "Ingresá tus nombres."
+  if (!datos.dni) return "Ingresá tu número de DNI."
+  if (datos.dni.length < 7 || datos.dni.length > 8) {
+    return "El DNI debe tener 7 u 8 dígitos."
+  }
+  return null
+}
+
+function mostrarErrorForm(msg) {
+  formError.textContent = msg
+  formError.hidden = false
+}
+
+function ocultarErrorForm() {
+  formError.hidden = true
+  formError.textContent = ""
+}
+
 // ─── Inicio del flujo ─────────────────────────────────────────────
-async function crearSesion(externalId) {
+async function crearSesion(externalId, datos) {
   return fetch("/api/crear-sesion", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      dni: "28543671",
+      dni: datos.dni,
+      apellido: datos.apellido,
+      nombres: datos.nombres,
       external_id: externalId,
       return_url: getPortalReturnUrl(),
     }),
@@ -119,10 +209,20 @@ async function crearSesion(externalId) {
 }
 
 async function iniciarValidacion() {
+  // Validar form antes de empezar.
+  const datos = leerForm()
+  const error = validarForm(datos)
+  if (error) {
+    mostrarErrorForm(error)
+    return
+  }
+  ocultarErrorForm()
+  datosIngresados = datos // snapshot para comparación posterior
+
   startBtn.disabled = true
   try {
     let externalId = getOrCreateExternalId()
-    let r = await crearSesion(externalId)
+    let r = await crearSesion(externalId, datos)
 
     // 409: el back tiene una sesion previa con este external_id que ya
     // se completo o expiro. Rotamos y reintentamos con uno nuevo.
@@ -130,7 +230,7 @@ async function iniciarValidacion() {
       console.debug("[Portal] external_id consumido, rotando")
       rotateExternalId()
       externalId = getOrCreateExternalId()
-      r = await crearSesion(externalId)
+      r = await crearSesion(externalId, datos)
     }
 
     if (!r.ok) {
@@ -290,6 +390,18 @@ function setApproved(detail) {
   document.getElementById("vd-dob").textContent      = dob
   document.getElementById("vd-liveness").textContent = liveness
   document.getElementById("vd-date").textContent     = now
+
+  // Tabla de comparación: lo que el usuario ingresó vs lo extraído por OCR.
+  // Demuestra visualmente que el sistema validó identidad, no solo "alguien
+  // pasó OCR". Si llegamos a setApproved es porque todo matchea.
+  renderCrossCheck({
+    apellidoIn: datosIngresados.apellido,
+    apellidoOut: ocr.apellido ?? "",
+    nombresIn: datosIngresados.nombres,
+    nombresOut: ocr.nombre ?? "",
+    dniIn: datosIngresados.dni,
+    dniOut: ocr.dni_number ?? "",
+  })
 
   statusBadge.className = "badge badge-approved"
   statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Aprobada'
