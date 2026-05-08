@@ -139,52 +139,6 @@ function hidratarHeaderDesdeStorage() {
   }
 }
 
-// Normaliza para comparación tolerante (uppercase + sin acentos + trim).
-// Mismo criterio que el back en _normalize_name de tracker.py.
-function normalizeName(value) {
-  if (!value) return ""
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")  // remover diacríticos
-    .toUpperCase()
-    .replace(/[^A-ZÑ ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function renderCrossCheck({ apellidoIn, apellidoOut, nombresIn, nombresOut, dniIn, dniOut }) {
-  // Apellido: match exacto normalizado.
-  const apellidoMatch = normalizeName(apellidoIn) === normalizeName(apellidoOut)
-  // Nombres: substring (uno contiene al otro). Mismo criterio que el back.
-  const nA = normalizeName(nombresIn)
-  const nB = normalizeName(nombresOut)
-  const nombresMatch = !!nA && !!nB && (nA.includes(nB) || nB.includes(nA))
-  // DNI: solo dígitos.
-  const dA = String(dniIn || "").replace(/\D/g, "")
-  const dB = String(dniOut || "").replace(/\D/g, "")
-  const dniMatch = !!dA && dA === dB
-
-  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text || "—" }
-  const setMark = (id, ok) => {
-    const el = document.getElementById(id)
-    if (!el) return
-    el.textContent = ok ? "✓" : "✗"
-    el.className = ok ? "cross-check-mark--ok" : "cross-check-mark--fail"
-  }
-
-  set("cc-apellido-in", apellidoIn)
-  set("cc-apellido-out", apellidoOut)
-  setMark("cc-apellido-mark", apellidoMatch)
-
-  set("cc-nombres-in", nombresIn)
-  set("cc-nombres-out", nombresOut)
-  setMark("cc-nombres-mark", nombresMatch)
-
-  set("cc-dni-in", formatDni(dniIn))
-  set("cc-dni-out", formatDni(dniOut))
-  setMark("cc-dni-mark", dniMatch)
-}
-
 function stopHostPolling() {
   if (hostPollTimer !== null) {
     clearInterval(hostPollTimer)
@@ -407,8 +361,14 @@ vb.addEventListener("validation:dismissed", (e) => {
 
 // ─── State transitions del portal ─────────────────────────────────
 function setWaiting() {
+  // Decisión 2026-05-08: durante la validación, el cliente solo ve el
+  // badge superior cambiar a "En validación". Se oculta el bloque del
+  // form (state-pending) y NO se muestra ningún bloque body — solo
+  // queda el header del trámite + step indicator. La pantalla queda
+  // limpia, sin "modal" intermedio. El cliente puede cerrar la pestaña
+  // tranquilo: cuando vuelva, el badge sigue diciendo el estado real.
   statusBadge.className = "badge badge-processing"
-  statusBadge.innerHTML = '<span class="badge-dot"></span> En proceso'
+  statusBadge.innerHTML = '<span class="badge-dot"></span> En validación'
 
   step1.className = "step-node step-done"
   step1.querySelector(".step-circle").innerHTML = '<i class="bi bi-check-lg"></i>'
@@ -418,7 +378,7 @@ function setWaiting() {
   step3.querySelector(".step-circle").textContent = "3"
 
   statePending.hidden      = true
-  stateWaiting.hidden      = false
+  stateWaiting.hidden      = true   // permanente: no se usa más como bloque visible
   stateApproved.hidden     = true
   stateRejected.hidden     = true
   stateManualReview.hidden = true
@@ -428,40 +388,14 @@ function setWaiting() {
 }
 
 function setApproved(detail) {
-  const ocr      = detail?.ocrResult  ?? {}
-  const bio      = detail?.biometryResult ?? {}
-  const nombre   = ocr.nombre   ?? ""
-  const apellido = ocr.apellido ?? ""
-  const fullName = [nombre, apellido].filter(Boolean).join(" ") || "—"
-  const dni      = formatDni(ocr.dni_number)
-  const dob      = ocr.fecha_nacimiento ?? "—"
-  const liveness = bio.liveness_score != null
-    ? Math.round(bio.liveness_score * 100) + "%"
-    : "—"
-  const now = new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
-
-  document.getElementById("vd-name").textContent     = fullName
-  document.getElementById("vd-dni").textContent      = dni
-  document.getElementById("vd-dob").textContent      = dob
-  document.getElementById("vd-liveness").textContent = liveness
-  document.getElementById("vd-date").textContent     = now
-
-  // Tabla de comparación: lo que el usuario ingresó vs lo extraído por OCR.
-  // Demuestra visualmente que el sistema validó identidad, no solo "alguien
-  // pasó OCR". Si llegamos a setApproved es porque todo matchea.
-  renderCrossCheck({
-    apellidoIn: datosIngresados.apellido,
-    apellidoOut: ocr.apellido ?? "",
-    nombresIn: datosIngresados.nombres,
-    nombresOut: ocr.nombre ?? "",
-    dniIn: datosIngresados.dni,
-    dniOut: ocr.dni_number ?? "",
-  })
-
-  // Actualizar avatar del header con los datos validados — el header pasa
-  // de "Sin identificar" (gris) a mostrar el nombre y DNI reales del
-  // usuario. Persistido en localStorage para sobrevivir al refresh.
-  // Usamos los datos OCR (autoritativos) en lugar de los ingresados.
+  // Decisión 2026-05-08: cartel simple, sin datos personales en el cliente.
+  // Los datos extraídos quedan solo en backoffice. Acá solo confirmamos al
+  // cliente que todo salió bien y habilitamos "Continuar con el trámite".
+  //
+  // El avatar del header sí se actualiza con el nombre validado para que
+  // el usuario vea que "ingresó" al sistema (señal visual, no datos
+  // sensibles que no deba conocer él mismo).
+  const ocr = detail?.ocrResult ?? {}
   setHeaderUsuario({
     apellido: ocr.apellido ?? datosIngresados.apellido,
     nombres: ocr.nombre ?? datosIngresados.nombres,

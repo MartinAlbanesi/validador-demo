@@ -153,65 +153,36 @@
         </button>
       </div>
 
-      <!-- Estado: esperando validación en celular -->
-      <div class="tramite-body" id="state-waiting" hidden>
-        <div class="state-icon-wrap state-icon-wrap--info">
-          <i class="bi bi-phone"></i>
-        </div>
-        <div class="state-content">
-          <h3 class="state-title">Esperando confirmación</h3>
-          <p class="state-text">Completá la verificación biométrica desde tu celular. Esta página se actualizará automáticamente cuando termines.</p>
-          <div class="review-autoupdate">
-            <span class="review-autoupdate-dot" aria-hidden="true"></span>
-            <span>Esperando resultado…</span>
-          </div>
-        </div>
-      </div>
+      <!-- Estado: esperando validación en celular.
+           OCULTO permanentemente desde 2026-05-08: mientras se procesa, el
+           cliente solo ve el badge superior cambiar a "En validación". El
+           bloque del trámite no se modifica hasta que llega el resultado.
+           Lo dejamos en el DOM para no romper referencias del JS legacy
+           (los IDs siguen existiendo) pero nunca se hace .hidden = false. -->
+      <div class="tramite-body" id="state-waiting" hidden></div>
 
-      <!-- Estado: aprobada -->
+      <!-- Estado: aprobada — cartel simple, sin datos personales.
+           El cliente final no debe ver sus datos ni los extraídos por el
+           escáner — esa info queda solo en el backoffice donde el admin
+           puede revisar y aprobar/rechazar. -->
       <div class="tramite-body" id="state-approved" hidden>
         <div class="state-icon-wrap state-icon-wrap--success">
           <i class="bi bi-patch-check-fill"></i>
         </div>
         <div class="state-content">
-          <h3 class="state-title">Identidad verificada correctamente</h3>
+          <h3 class="state-title">Validación exitosa</h3>
           <p class="state-text">Tu identidad fue validada con éxito. Podés continuar al paso de confirmación.</p>
-
-          <!-- Comparación cruzada: lo que el usuario ingresó al inicio
-               vs lo que el OCR extrajo del DNI físico. Demuestra que el
-               sistema validó identidad, no solo "alguien pasó OCR". -->
-          <div class="cross-check-table" id="cross-check-table">
-            <h4 class="cross-check-title">Comparación con tus datos</h4>
-            <table>
-              <thead>
-                <tr><th>Campo</th><th>Lo que ingresaste</th><th>Lo que extrajo el escáner</th><th></th></tr>
-              </thead>
-              <tbody>
-                <tr><td>Apellido</td><td id="cc-apellido-in">—</td><td id="cc-apellido-out">—</td><td id="cc-apellido-mark"></td></tr>
-                <tr><td>Nombres</td><td id="cc-nombres-in">—</td><td id="cc-nombres-out">—</td><td id="cc-nombres-mark"></td></tr>
-                <tr><td>DNI</td><td id="cc-dni-in">—</td><td id="cc-dni-out">—</td><td id="cc-dni-mark"></td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <dl class="verification-data">
-            <div class="vd-row"><dt>Nombre completo</dt><dd id="vd-name">—</dd></div>
-            <div class="vd-row"><dt>N.º de DNI</dt><dd id="vd-dni">—</dd></div>
-            <div class="vd-row"><dt>Fecha de nacimiento</dt><dd id="vd-dob">—</dd></div>
-            <div class="vd-row"><dt>Liveness score</dt><dd id="vd-liveness">—</dd></div>
-            <div class="vd-row vd-row--full"><dt>Verificado el</dt><dd id="vd-date">—</dd></div>
-          </dl>
         </div>
       </div>
 
-      <!-- Estado: rechazada -->
+      <!-- Estado: rechazada — cartel simple. -->
       <div class="tramite-body" id="state-rejected" hidden>
         <div class="state-icon-wrap state-icon-wrap--error">
           <i class="bi bi-x-circle-fill"></i>
         </div>
         <div class="state-content">
-          <h3 class="state-title">No se pudo verificar la identidad</h3>
-          <p class="state-text" id="rejection-message">La verificación biométrica no fue exitosa.</p>
+          <h3 class="state-title">Validación rechazada</h3>
+          <p class="state-text" id="rejection-message">No pudimos verificar tu identidad. Comunicate con el organismo si creés que fue un error.</p>
         </div>
       </div>
 
