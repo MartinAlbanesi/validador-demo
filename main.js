@@ -31,6 +31,10 @@ const VALIDATION_RETURN_PARAMS = [
 // ─── Element refs ─────────────────────────────────────────────────
 const vb              = document.getElementById("the-validator")
 const startBtn        = document.getElementById("start-btn")
+const portalUserEl    = document.getElementById("portal-user")
+const portalAvatarEl  = document.getElementById("portal-avatar")
+const portalNameEl    = document.getElementById("portal-user-name")
+const portalSubEl     = document.getElementById("portal-user-sub")
 const continueBtn     = document.getElementById("continue-btn")
 const retryBtn        = document.getElementById("retry-btn")
 const tramiteFooter   = document.getElementById("tramite-footer")
@@ -82,6 +86,57 @@ function formatDni(raw) {
   if (!raw) return "—"
   const d = String(raw).replace(/\D/g, "")
   return d.length === 8 ? d.replace(/(\d{2})(\d{3})(\d{3})/, "$1.$2.$3") : d
+}
+
+// ─── Avatar del header — actualizar al aprobarse la validacion ───
+// El header muestra "Sin identificar" (gris) hasta que la validacion
+// biometrica llega a approved. En ese momento se actualiza con los
+// datos del DNI extraido, persistiendo en localStorage para sobrevivir
+// al refresh. NO se actualiza en pending/manual_review/rejected — solo
+// identidad confirmada cambia el estado del header.
+const PORTAL_USER_KEY = "validador_portal_user"
+
+function setHeaderUsuario({ apellido, nombres, dni }) {
+  if (!portalUserEl) return
+  const nombreCompleto = [nombres, apellido].filter(Boolean).join(" ").trim()
+  if (!nombreCompleto) return // proteccion: no actualizar con datos vacios
+
+  // Iniciales: primera de nombres + primera de apellido (max 2 chars)
+  const ini = (nombres?.[0] ?? "") + (apellido?.[0] ?? "")
+  portalAvatarEl.textContent = (ini || "U").toUpperCase().slice(0, 2)
+  portalNameEl.textContent = nombreCompleto
+  portalSubEl.textContent = dni ? `DNI ${formatDni(dni)}` : ""
+  portalUserEl.classList.remove("portal-user--anonimo")
+
+  try {
+    localStorage.setItem(PORTAL_USER_KEY, JSON.stringify({ apellido, nombres, dni }))
+  } catch { /* localStorage puede no estar disponible — ignorar */ }
+}
+
+function setHeaderAnonimo() {
+  if (!portalUserEl) return
+  portalAvatarEl.textContent = "?"
+  portalNameEl.textContent = "Sin identificar"
+  portalSubEl.textContent = "Validá tu identidad"
+  portalUserEl.classList.add("portal-user--anonimo")
+}
+
+function hidratarHeaderDesdeStorage() {
+  try {
+    const raw = localStorage.getItem(PORTAL_USER_KEY)
+    if (!raw) {
+      setHeaderAnonimo()
+      return
+    }
+    const datos = JSON.parse(raw)
+    if (datos && datos.nombres && datos.apellido) {
+      setHeaderUsuario(datos)
+    } else {
+      setHeaderAnonimo()
+    }
+  } catch {
+    setHeaderAnonimo()
+  }
 }
 
 // Normaliza para comparación tolerante (uppercase + sin acentos + trim).
@@ -403,6 +458,16 @@ function setApproved(detail) {
     dniOut: ocr.dni_number ?? "",
   })
 
+  // Actualizar avatar del header con los datos validados — el header pasa
+  // de "Sin identificar" (gris) a mostrar el nombre y DNI reales del
+  // usuario. Persistido en localStorage para sobrevivir al refresh.
+  // Usamos los datos OCR (autoritativos) en lugar de los ingresados.
+  setHeaderUsuario({
+    apellido: ocr.apellido ?? datosIngresados.apellido,
+    nombres: ocr.nombre ?? datosIngresados.nombres,
+    dni: ocr.dni_number ?? datosIngresados.dni,
+  })
+
   statusBadge.className = "badge badge-approved"
   statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Aprobada'
 
@@ -515,6 +580,7 @@ function applyReturnedValidationState() {
 }
 
 // ─── Bootstrap ────────────────────────────────────────────────────
+hidratarHeaderDesdeStorage()
 applyReturnedValidationState()
 
 startBtn.addEventListener("click", iniciarValidacion)

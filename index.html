@@ -27,11 +27,17 @@
         <i class="bi bi-bell"></i>
         <span class="notif-dot">2</span>
       </button>
-      <div class="portal-user">
-        <div class="portal-avatar">JP</div>
+      <!-- Avatar del usuario logueado en el sistema del integrador.
+           Por default muestra estado "no validado" (placeholder); se
+           actualiza con los datos del DNI cuando la validacion biometrica
+           llega a approved (setApproved). NO se actualiza en pending,
+           manual_review ni rejected — solo identidad confirmada.
+           Persistido en localStorage para sobrevivir al refresh. -->
+      <div class="portal-user" id="portal-user">
+        <div class="portal-avatar" id="portal-avatar">?</div>
         <div class="portal-user-meta">
-          <span class="portal-user-name">Juan Pérez</span>
-          <span class="portal-user-sub">DNI 28.543.671</span>
+          <span class="portal-user-name" id="portal-user-name">Sin identificar</span>
+          <span class="portal-user-sub" id="portal-user-sub">Validá tu identidad</span>
         </div>
         <i class="bi bi-chevron-down portal-user-caret"></i>
       </div>

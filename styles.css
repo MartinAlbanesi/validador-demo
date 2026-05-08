@@ -144,6 +144,14 @@ button { font-family: var(--font-body); cursor: pointer; }
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+/* Estado "no validado" — gris, hasta que la verificación biométrica
+   llegue a approved. Cambia automático tras setApproved. */
+.portal-user--anonimo .portal-avatar {
+  background: #94a3b8;
+  color: #fff;
+}
+.portal-user--anonimo .portal-user-name { color: #94a3b8; font-style: italic; }
+.portal-user--anonimo .portal-user-sub { color: #cbd5e1; }
 
 .portal-user-meta { display: flex; flex-direction: column; gap: 1px; }
 .portal-user-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
