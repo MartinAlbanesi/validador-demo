@@ -514,24 +514,6 @@ function applyReturnedValidationState() {
   window.history.replaceState({}, "", url.toString())
 }
 
-// ─── Handlers globales para el modo declarativo del embed ────────
-// El boton con data-on-approved="manejarAprobacionDeclarativa" hace que
-// el embed ejecute window.manejarAprobacionDeclarativa(detail) al
-// llegar al estado approved. Reusamos la UI del portal (setApproved/
-// setRejected) para que la experiencia sea identica al boton
-// programatico — solo cambia el patron de integracion del HTML.
-window.manejarAprobacionDeclarativa = async function (detail) {
-  console.debug("[Portal] declarativo approved", detail)
-  const data = await fetchSessionDetail(detail.session_id)
-  setApproved(data)
-}
-
-window.manejarRechazoDeclarativo = function (detail) {
-  console.debug("[Portal] declarativo rejected", detail)
-  const code = detail?.rejection_code
-  setRejected({ error: `Verificación rechazada${code ? ` (${code})` : ""}.` })
-}
-
 // ─── Bootstrap ────────────────────────────────────────────────────
 applyReturnedValidationState()
 
