@@ -57,8 +57,12 @@ export default async function handler(req, res) {
   // Devolvemos solo los campos que el frontend del demo renderiza —
   // evita leakear más PII de lo necesario.
   res.status(200).json({
+    status: data.status ?? null,
+    score: data.score ?? null,            // 0-100 agregado
+    confidence: data.confidence ?? null,  // high/medium/review/low
+    rejection_code: data.rejection_code ?? null,
     dni_extracted: data.dni_extracted ?? null,
-    scores: data.scores ?? null,
+    scores: data.scores ?? null,          // técnicos: face_similarity, liveness_score
     completed_at: data.completed_at ?? null,
   })
 }

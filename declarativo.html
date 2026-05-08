@@ -87,6 +87,39 @@
     .resultado dt { color: #5b6878; }
     .resultado dd { margin: 0; color: #1a1f29; font-weight: 500; }
 
+    .scoring {
+      display: none;
+      margin: 16px 0;
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+      border: 1px solid #a7f3d0;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .scoring-number {
+      font-size: 56px;
+      font-weight: 800;
+      line-height: 1;
+      color: #065f46;
+      letter-spacing: -1px;
+    }
+    .scoring-number .max { font-size: 20px; color: #6b7280; font-weight: 500; }
+    .scoring-label {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .scoring-label.high   { background: #10b981; color: #fff; }
+    .scoring-label.medium { background: #f59e0b; color: #fff; }
+    .scoring-label.review { background: #6366f1; color: #fff; }
+    .scoring-label.low    { background: #ef4444; color: #fff; }
+    .scoring-help { font-size: 12px; color: #5b6878; margin-top: 8px; }
+
     .json-blocks { display: none; margin-top: 24px; text-align: left; }
     .json-blocks h4 {
       margin: 16px 0 6px;
@@ -134,11 +167,13 @@
 &lt;script&gt;
   window.mostrarResultado = async (detail) =&gt; {
     // detail = { session_id, completed_at }
-    // Para mostrar PII en la UI, fetch al backend del integrador:
+    // Fetch al backend del integrador para obtener score + PII:
     const r = await fetch(`/api/sesion-detalle?session_id=${detail.session_id}`)
     const data = await r.json()
+    // data.score      = 0-100 (entero)  ← scoring agregado
+    // data.confidence = "high"|"medium"|"review"|"low"  ← label
     // data.dni_extracted = { nombre, apellido, dni_number, ... }
-    // data.scores = { face_similarity, liveness_score }
+    // data.scores = { face_similarity, liveness_score }  ← técnicos (auditoría)
   }
 &lt;/script&gt;</pre>
 
@@ -158,6 +193,12 @@
       ✓ Validación aprobada. Datos recibidos del backend del integrador
       (vía fetch a <code>/api/sesion-detalle</code>):
     </div>
+    <div id="scoring" class="scoring">
+      <div class="scoring-number"><span id="r-score">—</span><span class="max">/100</span></div>
+      <div id="r-confidence" class="scoring-label">—</div>
+      <div class="scoring-help">Score agregado calculado por el validador (0-100). Combina face match + prueba de vida + status final.</div>
+    </div>
+
     <div id="resultado" class="resultado">
       <h3>Datos del trámite (renderizados en la UI)</h3>
       <dl>
@@ -218,6 +259,18 @@
         document.getElementById("r-liveness").textContent = liveness
         document.getElementById("r-face").textContent = face
         document.getElementById("r-fecha").textContent = fecha
+
+        // Scoring agregado: 0-100 + label semántico high/medium/review/low.
+        // El cliente puede mostrar el número o el label según preferencia UX.
+        const score = data.score
+        const confidence = data.confidence
+        if (score != null && confidence) {
+          document.getElementById("r-score").textContent = score
+          const labelEl = document.getElementById("r-confidence")
+          labelEl.textContent = confidence.toUpperCase()
+          labelEl.className = `scoring-label ${confidence}`
+          document.getElementById("scoring").style.display = "block"
+        }
 
         document.getElementById("estado-ok").style.display = "block"
         document.getElementById("resultado").style.display = "block"
