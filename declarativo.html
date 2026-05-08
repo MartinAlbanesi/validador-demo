@@ -144,6 +144,39 @@
     .json-blocks .str { color: #86efac; }
     .json-blocks .num { color: #fbbf24; }
     .json-blocks .null { color: #fca5a5; }
+
+    .cross-check {
+      margin: 16px 0;
+      padding: 16px 20px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+    }
+    .cross-check label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #78350f;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cross-check input {
+      width: 200px;
+      padding: 8px 12px;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: ui-monospace, monospace;
+      background: #fff;
+    }
+    .cross-check .help {
+      font-size: 12px;
+      color: #78350f;
+      margin: 8px 0 0;
+      line-height: 1.5;
+    }
+    .cross-check .help strong { color: #451a03; }
   </style>
 </head>
 <body>
@@ -160,6 +193,7 @@
 
 &lt;button data-validador-biometrico
         data-session-url="/api/crear-sesion"
+        data-fetch-body='{"dni":"28543671"}'  &lt;!-- DNI esperado del trámite --&gt;
         data-on-approved="mostrarResultado"&gt;
   Validar identidad
 &lt;/button&gt;
@@ -179,8 +213,20 @@
 
   <p class="label">Probalo</p>
   <div class="demo-area">
-    <button data-validador-biometrico
+    <div class="cross-check">
+      <label for="dni-esperado">DNI esperado del trámite</label>
+      <input id="dni-esperado" type="text" value="28543671" maxlength="8" inputmode="numeric" />
+      <p class="help">
+        ⚠ <strong>En producción real este valor NO viene de un input editable</strong>
+        — el backend del integrador lo lee de la sesión del usuario logueado.
+        Acá lo exponemos para demostrar el cross-check: si escaneás un DNI distinto,
+        el validador rechaza con <code>identity_mismatch</code>.
+      </p>
+    </div>
+    <button id="validar-btn"
+            data-validador-biometrico
             data-session-url="/api/crear-sesion"
+            data-fetch-body='{"dni":"28543671"}'
             data-on-approved="mostrarResultado"
             data-on-rejected="manejarRechazo"
             data-on-manual-review="manejarRevisionManual"
@@ -232,6 +278,22 @@
   </div>
 
   <script>
+    // Cross-check del DNI: el input "DNI esperado" se sincroniza con
+    // data-fetch-body del botón antes de cada click. Cuando el embed
+    // dispara el POST a /api/crear-sesion, el body incluye el dni del
+    // input. El backend (Vercel Function) lo pasa al validador como
+    // expected_dni; si el cliente está configurado con
+    // enforce_cuit_match=true, el cross-check rechaza si el DNI
+    // escaneado no matchea.
+    const dniInput = document.getElementById("dni-esperado")
+    const validarBtn = document.getElementById("validar-btn")
+    function syncDni() {
+      const value = (dniInput.value || "").replace(/\D/g, "").slice(0, 8)
+      validarBtn.setAttribute("data-fetch-body", JSON.stringify({ dni: value }))
+    }
+    dniInput.addEventListener("input", syncDni)
+    syncDni() // estado inicial
+
     // Handler global del callback declarativo data-on-approved="mostrarResultado"
     // El embed lo ejecuta al recibir validation:approved, con el detail del evento.
     window.mostrarResultado = async function (detail) {
