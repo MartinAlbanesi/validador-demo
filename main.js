@@ -91,46 +91,22 @@ function formatDni(raw) {
 // ─── Avatar del header — actualizar al aprobarse la validacion ───
 // El header muestra "Sin identificar" (gris) hasta que la validacion
 // biometrica llega a approved. En ese momento se actualiza con los
-// datos del DNI extraido, persistiendo en localStorage para sobrevivir
-// al refresh. NO se actualiza en pending/manual_review/rejected — solo
-// identidad confirmada cambia el estado del header.
-const PORTAL_USER_KEY = "validador_portal_user"
+// datos del DNI extraido. NO se persiste entre recargas: F5 = empezar
+// de cero (intencional — el usuario que recarga quiere reiniciar).
+// Solo memoria del DOM, no localStorage ni sessionStorage.
+//
+// Las keys legacy (validador_portal_user, validador_portal_last_state)
+// se purgan en el bootstrap para que testers que las tengan cargadas
+// de versiones previas no vean datos viejos.
+const LEGACY_STORAGE_KEYS = [
+  "validador_portal_user",
+  "validador_portal_last_state",
+]
 
-// Persistencia del estado terminal del trámite. Sobrevive al refresh
-// para que el cliente vea el resultado consistente con el header
-// (si el avatar dice "Lucas Medina", el bloque del trámite debe
-// decir "Validación exitosa", no "Pendiente"). Limpiado al iniciar
-// una nueva validación o tras un error transitorio.
-const PORTAL_LAST_STATE_KEY = "validador_portal_last_state"
-
-function persistTerminalState(status, detail) {
+function purgeLegacyStorage() {
   try {
-    localStorage.setItem(
-      PORTAL_LAST_STATE_KEY,
-      JSON.stringify({ status, detail: detail ?? null })
-    )
+    LEGACY_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k))
   } catch { /* localStorage puede no estar disponible — ignorar */ }
-}
-
-function clearPortalTerminalState() {
-  try {
-    localStorage.removeItem(PORTAL_LAST_STATE_KEY)
-  } catch { /* idem */ }
-}
-
-function restorePortalStateFromStorage() {
-  try {
-    const raw = localStorage.getItem(PORTAL_LAST_STATE_KEY)
-    if (!raw) return false
-    const { status, detail } = JSON.parse(raw)
-    if (status === "approved")          setApproved(detail || {})
-    else if (status === "rejected")     setRejected(detail || {}, { persist: false })
-    else if (status === "manual_review") setManualReview()
-    else return false
-    return true
-  } catch {
-    return false
-  }
 }
 
 function setHeaderUsuario({ apellido, nombres, dni }) {
@@ -144,10 +120,7 @@ function setHeaderUsuario({ apellido, nombres, dni }) {
   portalNameEl.textContent = nombreCompleto
   portalSubEl.textContent = dni ? `DNI ${formatDni(dni)}` : ""
   portalUserEl.classList.remove("portal-user--anonimo")
-
-  try {
-    localStorage.setItem(PORTAL_USER_KEY, JSON.stringify({ apellido, nombres, dni }))
-  } catch { /* localStorage puede no estar disponible — ignorar */ }
+  // No persistimos: el header vive solo en el DOM. F5 vuelve a anónimo.
 }
 
 function setHeaderAnonimo() {
@@ -156,24 +129,6 @@ function setHeaderAnonimo() {
   portalNameEl.textContent = "Sin identificar"
   portalSubEl.textContent = "Validá tu identidad"
   portalUserEl.classList.add("portal-user--anonimo")
-}
-
-function hidratarHeaderDesdeStorage() {
-  try {
-    const raw = localStorage.getItem(PORTAL_USER_KEY)
-    if (!raw) {
-      setHeaderAnonimo()
-      return
-    }
-    const datos = JSON.parse(raw)
-    if (datos && datos.nombres && datos.apellido) {
-      setHeaderUsuario(datos)
-    } else {
-      setHeaderAnonimo()
-    }
-  } catch {
-    setHeaderAnonimo()
-  }
 }
 
 function stopHostPolling() {
@@ -265,11 +220,6 @@ async function iniciarValidacion() {
   ocultarErrorForm()
   datosIngresados = datos // snapshot para comparación posterior
 
-  // Empezamos un flujo nuevo: limpiar el estado terminal persistido
-  // (de una validación anterior). Si no lo hacemos, un refresh durante
-  // el QR scan re-aplicaría el estado viejo en lugar de "En validación".
-  clearPortalTerminalState()
-
   startBtn.disabled = true
   try {
     let externalId = getOrCreateExternalId()
@@ -289,7 +239,7 @@ async function iniciarValidacion() {
       console.error("[Portal] crear-sesion fallo:", r.status, err)
       // Error transitorio (back caído, etc) — no persistir, dejar que el
       // cliente reintente al refrescar.
-      setRejected({ error: "No se pudo iniciar la verificación. Intentá de nuevo." }, { persist: false })
+      setRejected({ error: "No se pudo iniciar la verificación. Intentá de nuevo." })
       return
     }
     const { session_id } = await r.json()
@@ -299,7 +249,7 @@ async function iniciarValidacion() {
     vb.open()
   } catch (err) {
     console.error("[Portal] crear-sesion error:", err)
-    setRejected({ error: "Error de red. Verificá tu conexión." }, { persist: false })
+    setRejected({ error: "Error de red. Verificá tu conexión." })
   } finally {
     startBtn.disabled = false
   }
@@ -464,16 +414,9 @@ function setApproved(detail) {
   tramiteFooter.hidden     = false
   continueBtn.hidden       = false
   retryBtn.hidden          = true
-
-  // Persistir para que un refresh muestre el mismo estado terminal.
-  // Detail mínimo: solo lo que setApproved necesita para reconstruir el UI.
-  persistTerminalState("approved", { ocrResult: ocr })
 }
 
-// Errores transitorios (network, fallo de crear-sesion) NO deben persistir —
-// el cliente debería poder reintentar al refrescar. `options.persist=false`
-// evita guardar el estado en localStorage.
-function setRejected(detail, options = { persist: true }) {
+function setRejected(detail) {
   const errorMsg = detail?.error ?? "La verificación no pudo completarse."
   document.getElementById("rejection-message").textContent = errorMsg
 
@@ -495,10 +438,6 @@ function setRejected(detail, options = { persist: true }) {
   tramiteFooter.hidden     = false
   continueBtn.hidden       = true
   retryBtn.hidden          = false
-
-  if (options?.persist !== false) {
-    persistTerminalState("rejected", { error: errorMsg })
-  }
 }
 
 function setManualReview() {
@@ -520,8 +459,6 @@ function setManualReview() {
   tramiteFooter.hidden     = true
   continueBtn.hidden       = true
   retryBtn.hidden          = true
-
-  persistTerminalState("manual_review", null)
 }
 
 // ─── Mobile flow: el SPA vuelve al portal con params en la URL ────
@@ -572,18 +509,18 @@ function applyReturnedValidationState() {
 }
 
 // ─── Bootstrap ────────────────────────────────────────────────────
-// Orden importa: primero el header (avatar), luego el estado del trámite.
-// El estado del trámite tiene prioridad URL params > localStorage:
-//   1. Si volvemos del flow mobile (URL trae validation_status=...) →
-//      apply lo aplica y persiste, ignora localStorage.
-//   2. Sino, si hay un estado terminal persistido (refresh post-validación)
-//      → restore desde localStorage.
-//   3. Sino → estado pending por default (form visible).
-hidratarHeaderDesdeStorage()
-const appliedFromUrl = applyReturnedValidationState()
-if (!appliedFromUrl) {
-  restorePortalStateFromStorage()
-}
+// F5 = empezar de cero (decisión 2026-05-08). El cliente que recarga
+// quiere reiniciar — no preservar el estado de una validación previa.
+// Por eso:
+//   1. Purgar keys de localStorage de versiones previas que sí persistían.
+//   2. Header arranca anónimo siempre.
+//   3. Si la URL trae params del flow mobile (volvió del SPA del celu),
+//      aplicar ese estado puntual. Es el único caso donde NO arrancamos
+//      en pending — el cliente literalmente acaba de validar.
+//   4. Sino, queda en pending (form visible) por default del HTML.
+purgeLegacyStorage()
+setHeaderAnonimo()
+applyReturnedValidationState()
 
 startBtn.addEventListener("click", iniciarValidacion)
 retryBtn.addEventListener("click", iniciarValidacion)
