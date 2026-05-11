@@ -130,17 +130,9 @@
 
       <!-- Estado: pendiente -->
       <div class="tramite-body tramite-body--cta" id="state-pending">
-        <p class="state-hint">Completá tus datos tal cual figuran en tu DNI antes de iniciar la verificación. Vamos a comparar contra lo que extrae el escáner.</p>
+        <p class="state-hint">Ingresá tu número de DNI antes de iniciar la verificación. Lo vamos a comparar con lo que extraiga el escáner del DNI físico.</p>
 
         <form id="datos-form" class="datos-form" autocomplete="off">
-          <div class="datos-form-row">
-            <label for="form-apellido">Apellido <span class="req">*</span></label>
-            <input id="form-apellido" name="apellido" type="text" required maxlength="80" placeholder="Ej: Pérez" />
-          </div>
-          <div class="datos-form-row">
-            <label for="form-nombres">Nombres <span class="req">*</span></label>
-            <input id="form-nombres" name="nombres" type="text" required maxlength="80" placeholder="Ej: Juan Carlos" />
-          </div>
           <div class="datos-form-row">
             <label for="form-dni">N.º de DNI <span class="req">*</span></label>
             <input id="form-dni" name="dni" type="text" required inputmode="numeric" maxlength="8" pattern="\d{7,8}" placeholder="Solo números, sin puntos" />

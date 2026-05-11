@@ -153,30 +153,28 @@ async function fetchSessionDetail(sessionId) {
 }
 
 // ─── Form de datos del usuario ────────────────────────────────────
-// El usuario completa apellido + nombres + DNI antes de iniciar. Esos
-// datos se mandan al back como expected_*. El cross-check los compara
-// contra lo extraído por OCR. Si NO coinciden ⇒ identity_mismatch.
+// Decisión 2026-05-12: solo pedimos DNI al cliente. El cross-check del
+// back compara únicamente DNI declarado vs DNI extraído del OCR. Antes
+// pedíamos apellido+nombres también — los sacamos para reducir fricción
+// del usuario final. El back sigue aceptando apellido/nombres como
+// opcionales (expected_apellido/expected_nombres) por si algún integrador
+// quiere cross-check más estricto, pero el demo se queda con DNI nada más.
 const datosForm = document.getElementById("datos-form")
-const formApellido = document.getElementById("form-apellido")
-const formNombres = document.getElementById("form-nombres")
 const formDni = document.getElementById("form-dni")
 const formError = document.getElementById("form-error")
 
-// Snapshot de lo que el usuario ingresó al click — se usa después en la
-// pantalla de éxito para mostrar comparación "vos dijiste vs OCR extrajo".
-let datosIngresados = { apellido: "", nombres: "", dni: "" }
+// Snapshot del DNI ingresado al click — se usa después en setApproved
+// para hidratar el avatar del header con el DNI hasta que llegue el OCR
+// con apellido/nombre reales.
+let datosIngresados = { dni: "" }
 
 function leerForm() {
   return {
-    apellido: (formApellido?.value ?? "").trim(),
-    nombres: (formNombres?.value ?? "").trim(),
     dni: (formDni?.value ?? "").trim().replace(/\D/g, ""),
   }
 }
 
 function validarForm(datos) {
-  if (!datos.apellido) return "Ingresá tu apellido (tal cual figura en el DNI)."
-  if (!datos.nombres) return "Ingresá tus nombres."
   if (!datos.dni) return "Ingresá tu número de DNI."
   if (datos.dni.length < 7 || datos.dni.length > 8) {
     return "El DNI debe tener 7 u 8 dígitos."
@@ -201,8 +199,6 @@ async function crearSesion(externalId, datos) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       dni: datos.dni,
-      apellido: datos.apellido,
-      nombres: datos.nombres,
       external_id: externalId,
       return_url: getPortalReturnUrl(),
     }),
@@ -389,10 +385,12 @@ function setApproved(detail) {
   // El avatar del header sí se actualiza con el nombre validado para que
   // el usuario vea que "ingresó" al sistema (señal visual, no datos
   // sensibles que no deba conocer él mismo).
+  // Para el avatar usamos los datos del OCR (autoritativos). El cliente
+  // solo ingresa DNI ahora — apellido/nombres salen del DNI escaneado.
   const ocr = detail?.ocrResult ?? {}
   setHeaderUsuario({
-    apellido: ocr.apellido ?? datosIngresados.apellido,
-    nombres: ocr.nombre ?? datosIngresados.nombres,
+    apellido: ocr.apellido ?? "",
+    nombres: ocr.nombre ?? "",
     dni: ocr.dni_number ?? datosIngresados.dni,
   })
 
