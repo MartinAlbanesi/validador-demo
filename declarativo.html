@@ -177,9 +177,32 @@
       line-height: 1.5;
     }
     .cross-check .help strong { color: #451a03; }
+
+    .deprecation-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-left: 4px solid #dc2626;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 0 0 32px;
+      color: #7f1d1d;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .deprecation-banner strong { color: #450a0a; }
+    .deprecation-banner a { color: #991b1b; font-weight: 600; }
   </style>
 </head>
 <body>
+
+  <div class="deprecation-banner">
+    ⚠ <strong>Modo legacy (embed-v1)</strong> — el modo declarativo se mantiene
+    funcional hasta el <strong>2027-01-01</strong> pero las integraciones nuevas
+    deben usar el patrón v2 (motor puro). Ver el snippet recomendado en
+    <a href="/">la página principal del demo</a> o en la
+    <a href="https://validador-atm.duckdns.org/docs/integracion-quickstart.md">guía
+    rápida</a>.
+  </div>
 
   <h1>Validador Biométrico</h1>
   <p class="lead">
