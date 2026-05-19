@@ -1,2 +1,19 @@
 dist/
 node_modules/
+
+# Configuracion local de agentes de codigo (Claude Code, Gemini, etc.).
+# El settings.local.json puede contener flags/paths/secretos por dev.
+.claude/
+.gemini/
+.opencode/
+.codex/
+.agent/
+.playwright-mcp/
+
+# Skills compartidas del equipo via Vercel `skills` CLI. Ignoramos .agents/
+# por default (es scratch del agente) pero exceptuamos las skills explicitamente
+# instaladas — viajan con el repo para que cualquier dev las tenga al clonar.
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/find-skills/
